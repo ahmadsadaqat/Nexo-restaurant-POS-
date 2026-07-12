@@ -90,7 +90,6 @@ def _fetch_item_prices(
         SELECT
             item_code,
             price_list_rate,
-            market_rate,
             currency,
             uom,
             customer
@@ -98,7 +97,6 @@ def _fetch_item_prices(
             SELECT
                 item_code,
                 price_list_rate,
-                market_rate,
                 currency,
                 uom,
                 customer,
@@ -554,7 +552,7 @@ def merge_item_row(
             "serial_no_data": lookup_data.serial_map.get(item_code, []),
             "rate": price_row.get("price_list_rate") if price_row else 0,
             "price_list_rate": price_row.get("price_list_rate") if price_row else 0,
-            "market_rate": price_row.get("market_rate") if price_row else 0,
+            "market_rate": 0,
             "currency": price_currency or price_list_currency,
             "price_list_currency": price_list_currency,
             "plc_conversion_rate": exchange_rate,
