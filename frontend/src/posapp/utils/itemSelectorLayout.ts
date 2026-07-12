@@ -7,12 +7,12 @@
  */
 export const getCardColumns = (width: number): number => {
 	if (width <= 768) {
-		return 1;
-	}
-	if (width <= 1200) {
 		return 2;
 	}
-	return 3;
+	if (width <= 1200) {
+		return 3;
+	}
+	return 4;
 };
 
 /**

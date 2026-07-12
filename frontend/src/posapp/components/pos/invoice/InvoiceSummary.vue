@@ -107,6 +107,7 @@
 					@open-invoice-management="handleOpenInvoiceManagement"
 					@open-returns="handleOpenReturns"
 					@print-draft="handlePrintDraft"
+					@print-kot="$emit('print-kot')"
 					@show-payment="handleShowPayment"
 					@open-customer-display="handleOpenCustomerDisplay"
 				/>
@@ -237,6 +238,7 @@ const emit = defineEmits([
 	"open-invoice-management",
 	"open-returns",
 	"print-draft",
+	"print-kot",
 	"show-payment",
 	"open-customer-display",
 	"resume-parked-order",

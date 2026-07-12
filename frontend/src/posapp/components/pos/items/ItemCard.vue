@@ -28,7 +28,6 @@
 		<div class="card-item-content">
 			<div class="card-item-header">
 				<h4 class="card-item-name">{{ item.item_name }}</h4>
-				<span class="card-item-code">{{ item.item_code }}</span>
 			</div>
 			<div class="card-item-details">
 				<div class="card-item-price">
@@ -39,13 +38,6 @@
 						<span class="price-amount">
 							{{ formatCurrency(primaryRate, primaryCurrency, primaryPrecision) }}
 						</span>
-						<ItemRateInfoMenu
-							v-if="showRateInfo"
-							:rate-info="rateInfo"
-							:currency-symbol="currencySymbol"
-							:format-currency="formatCurrency"
-							:rate-precision="ratePrecision"
-						/>
 					</div>
 					<div v-if="showSecondaryPrice" class="secondary-price">
 						<span class="currency-symbol">
@@ -56,18 +48,6 @@
 						</span>
 					</div>
 				</div>
-				<div class="card-item-stock">
-					<v-icon size="small" class="stock-icon"> mdi-package-variant </v-icon>
-					<span
-						class="stock-amount"
-						:class="{
-							'negative-number': isNegative(item.actual_qty),
-						}"
-					>
-						{{ formattedActualQty }}
-					</span>
-					<span class="stock-uom">{{ item.stock_uom || "" }}</span>
-				</div>
 			</div>
 		</div>
 	</div>
@@ -76,7 +56,6 @@
 <script setup>
 import { computed } from "vue";
 import placeholderImage from "../placeholder-image.png";
-import ItemRateInfoMenu from "./ItemRateInfoMenu.vue";
 import { priceListToSelectedCurrency } from "../../../utils/erpnextCurrency";
 
 const props = defineProps({
@@ -254,12 +233,12 @@ const onDragEnd = (event) => {
 }
 
 .card-item-content {
-	padding: var(--pos-space-3);
+	padding: var(--pos-space-1);
 	display: flex;
 	flex-direction: column;
 	flex-grow: 1;
 	justify-content: space-between;
-	gap: var(--pos-space-2);
+	gap: 4px;
 }
 
 .card-item-header {
@@ -279,16 +258,6 @@ const onDragEnd = (event) => {
 	-webkit-line-clamp: 2;
 	line-clamp: 2;
 	-webkit-box-orient: vertical;
-}
-
-.card-item-code {
-	font-size: 0.74rem;
-	color: var(--pos-text-secondary);
-	display: block;
-	white-space: nowrap;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	letter-spacing: 0.02em;
 }
 
 .card-item-details {
@@ -321,48 +290,17 @@ const onDragEnd = (event) => {
 	color: var(--pos-text-secondary);
 }
 
-.card-item-stock {
-	text-align: right;
-	font-size: 0.82rem;
-	color: var(--pos-text-secondary);
-	display: flex;
-	flex-direction: row;
-	align-items: flex-end;
-	gap: 6px;
-	padding: 6px 8px;
-	border-radius: var(--pos-radius-xs);
-	background: var(--pos-hover-bg);
-	white-space: nowrap;
-}
-
-.stock-amount {
-	font-weight: 600;
-}
-
-.stock-amount.negative-number {
-	color: rgb(var(--v-theme-error));
-}
-
-.stock-uom {
-	font-size: 0.7rem;
-	text-transform: uppercase;
-}
-
 @media (max-width: 768px) {
 	.card-item-image-container {
 		height: 112px;
 	}
 
 	.card-item-content {
-		padding: var(--pos-space-2);
+		padding: var(--pos-space-1);
 	}
 
 	.card-item-name {
 		font-size: 0.85rem;
-	}
-
-	.card-item-code {
-		font-size: 0.7rem;
 	}
 }
 </style>

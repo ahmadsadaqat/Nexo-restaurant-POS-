@@ -418,6 +418,9 @@ export function get_invoice_doc(context: any) {
 	doc.posa_delivery_charges = context.selected_delivery_charge?.name || null;
 	doc.posa_delivery_charges_rate = context.delivery_charges_rate || 0;
 	doc.posa_notes = sourceDoc.posa_notes ?? null;
+	doc.posa_order_type = context.invoiceStore?.orderType || "Dine In";
+	doc.posa_table_no = context.invoiceStore?.tableNo || null;
+	doc.custom_rider = context.invoiceStore?.customRider || null;
 	doc.posa_authorization_code = sourceDoc.posa_authorization_code ?? null;
 	doc.posa_return_valid_upto = sourceDoc.posa_return_valid_upto ?? null;
 	doc.posting_date = normalizeBackendDate(

@@ -228,6 +228,10 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		doc: PartialInvoiceDoc | string | null | undefined,
 	) => {
 		invoiceDoc.value = normalizeDoc(doc);
+		if (invoiceDoc.value) {
+			tableNo.value = invoiceDoc.value.posa_table_no || "";
+			orderType.value = invoiceDoc.value.posa_order_type || "Dine In";
+		}
 		touch();
 	};
 
@@ -259,6 +263,9 @@ export const useInvoiceStore = defineStore("invoice", () => {
 	const deliveryCharges = ref<DeliveryCharge[]>([]);
 	const deliveryChargesRate = ref(0);
 	const selectedDeliveryCharge = ref("");
+	const tableNo = ref("");
+	const orderType = ref("Dine In");
+	const customRider = ref("");
 	/**
 	 * `true` when `invoiceType` is `"Order"` or `"Quotation"`.
 	 *
@@ -618,6 +625,9 @@ export const useInvoiceStore = defineStore("invoice", () => {
 			additionalDiscount.value = 0;
 			additionalDiscountPercentage.value = 0;
 			resetDeliveryCharges();
+			tableNo.value = "";
+			orderType.value = "Dine In";
+			customRider.value = "";
 		}
 
 		touch();
@@ -731,6 +741,9 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		deliveryCharges,
 		deliveryChargesRate,
 		selectedDeliveryCharge,
+		tableNo,
+		orderType,
+		customRider,
 		// Setters
 		setDiscountAmount,
 		setAdditionalDiscount,
@@ -739,6 +752,18 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		setDeliveryChargesRate,
 		setSelectedDeliveryCharge,
 		resetDeliveryCharges,
+		setTableNo: (val: string) => { 
+			tableNo.value = val; 
+			mergeInvoiceDoc({ posa_table_no: val });
+		},
+		setOrderType: (val: string) => { 
+			orderType.value = val; 
+			mergeInvoiceDoc({ posa_order_type: val });
+		},
+		setCustomRider: (val: string) => { 
+			customRider.value = val; 
+			mergeInvoiceDoc({ custom_rider: val });
+		},
 	};
 });
 

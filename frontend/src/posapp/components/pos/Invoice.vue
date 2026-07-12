@@ -181,24 +181,7 @@
 					</div>
 
 					<v-card flat class="invoice-section-card invoice-items-card pos-themed-card">
-						<div class="invoice-section-heading">
-							<h3 class="invoice-section-heading__title">{{ __("Invoice Items") }}</h3>
-						</div>
 						<div class="items-table-wrapper">
-							<InvoiceItemsActionToolbar
-								ref="actionToolbar"
-								:itemSearch="itemSearch"
-								:availableColumns="available_columns"
-								:selectedColumns="selected_columns"
-								@update:itemSearch="itemSearch = $event"
-								@update:selectedColumns="
-									(cols) => {
-										setSelectedColumns(cols);
-										saveColumnPreferences();
-									}
-								"
-							/>
-
 							<ItemsTable
 								ref="itemsTableRef"
 								:headers="items_headers"
@@ -297,6 +280,7 @@
 				@open-invoice-management="open_invoice_management"
 				@open-returns="open_returns"
 				@print-draft="print_draft_invoice"
+				@print-kot="print_kot"
 				@show-payment="handleShowPaymentRequest"
 				@open-customer-display="handleOpenCustomerDisplayRequest"
 			/>
@@ -981,6 +965,68 @@ export default {
 				prorated,
 			});
 			return -Math.abs(prorated);
+		},
+		async print_kot() {
+			if (!this.items.length) {
+				this.toastStore.show({ message: this.__("Cart is empty"), color: "error" });
+				return;
+			}
+			
+			if (this.invoiceStore.orderType === "Dine In" && !this.invoiceStore.tableNo) {
+				this.toastStore.show({ message: this.__("Please select a table for Dine In orders"), color: "error" });
+				return;
+			}
+			if (this.invoiceStore.orderType === "Delivery" && !this.invoiceStore.customRider) {
+				this.toastStore.show({ message: this.__("Please assign a rider for Delivery orders"), color: "error" });
+				return;
+			}
+
+			// Save the invoice as an unpaid invoice (Draft)
+			let saved_invoice_name = "";
+			try {
+				this.toastStore.show({ message: this.__("Saving invoice..."), color: "info" });
+				const doc = this.get_invoice_doc();
+				const saved_invoice = await this.update_invoice(doc);
+				if (!saved_invoice) {
+					this.toastStore.show({ message: this.__("Failed to save invoice"), color: "error" });
+					return;
+				}
+				saved_invoice_name = saved_invoice.name || this.invoiceStore.invoiceDoc.name;
+			} catch (e) {
+				console.error("Error saving invoice for KOT:", e);
+				this.toastStore.show({ message: this.__("Error saving invoice"), color: "error" });
+				return;
+			}
+
+			this.toastStore.show({ message: this.__("Creating KOT..."), color: "info" });
+			try {
+				const itemsToPrint = this.items.map((i) => ({
+					item_code: i.item_code,
+					item_name: i.item_name,
+					qty: i.qty,
+				}));
+				const payload = {
+					items: itemsToPrint,
+					table_no: this.invoiceStore.tableNo,
+					order_type: this.invoiceStore.orderType,
+					branch: this.pos_profile.custom_branch || this.pos_profile.branch || this.pos_profile.company,
+					invoice_no: saved_invoice_name,
+				};
+				const response = await window.frappe.call({
+					method: "nexo_kds.api.create_kot",
+					args: {
+						payload: JSON.stringify(payload),
+					},
+				});
+				if (response.message && response.message.success) {
+					this.toastStore.show({ message: this.__("KOT Created: ") + response.message.name, color: "success" });
+				} else {
+					this.toastStore.show({ message: this.__("Failed to create KOT: ") + (response.message ? response.message.message : ""), color: "error" });
+				}
+			} catch (e) {
+				console.error(e);
+				this.toastStore.show({ message: this.__("Error creating KOT"), color: "error" });
+			}
 		},
 
 		handleSetAllItems(data) {

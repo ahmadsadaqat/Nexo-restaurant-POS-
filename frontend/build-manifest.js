@@ -60,8 +60,6 @@ export function buildVersionPayload(version, bundle = {}) {
 	const cssFile = getCssAssetFileName(bundle);
 	const fontFiles = getCriticalFontAssetFileNames(bundle);
 
-	const posawesomeFile = getChunkFileName(bundle, "posawesome");
-
 	return {
 		version,
 		assets: {

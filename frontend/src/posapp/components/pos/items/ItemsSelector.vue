@@ -74,7 +74,31 @@
 				/>
 
 				<v-card flat class="selector-section-card selector-results-card pos-themed-card">
-					<v-row class="items">
+					<v-slide-group
+						v-model="item_group"
+						show-arrows
+						class="px-2 pt-4 pb-4"
+					>
+						<v-slide-group-item
+							v-for="group in items_group"
+							:key="group"
+							:value="group"
+							v-slot="{ isSelected, toggle }"
+						>
+							<v-btn
+								:color="isSelected ? 'primary' : undefined"
+								:variant="isSelected ? 'flat' : 'tonal'"
+								class="mx-1 font-weight-medium"
+								rounded="xl"
+								size="default"
+								@click="toggle"
+								elevation="0"
+							>
+								{{ group }}
+							</v-btn>
+						</v-slide-group-item>
+					</v-slide-group>
+					<v-row class="items pt-2">
 						<v-col cols="12" class="pt-0 mt-0">
 							<ItemsSelectorCards
 								v-if="items_view === 'card'"
@@ -161,18 +185,6 @@
 				</div>
 			</v-expand-transition>
 		</v-card>
-		<ItemActionToolbar
-			v-model="item_group"
-			:items-group="items_group"
-			v-model:items-view="items_view"
-			:pos-profile="pos_profile"
-			:active-price-list="active_price_list"
-			:offers-count="offersCount"
-			:coupons-count="couponsCount"
-			:reserve-bottom-dock-space="context === 'pos' && responsive.windowWidth.value < 1100"
-			@open-offers="uiStore.setActiveView('offers')"
-			@open-coupons="uiStore.setActiveView('coupons')"
-		/>
 
 		<!-- New Item Dialog -->
 		<NewItemDialog
@@ -212,7 +224,6 @@ import { storeToRefs } from "pinia";
 import * as _ from "lodash";
 
 import CameraScanner from "./CameraScanner.vue";
-import ItemActionToolbar from "./ItemActionToolbar.vue";
 import ItemSettingsDialog from "./ItemSettingsDialog.vue";
 import ItemHeader from "./ItemHeader.vue";
 import ItemsSelectorCards from "./ItemsSelectorCards.vue";
@@ -355,7 +366,7 @@ const {
 // 2. Local State & Settings
 const search_input = ref("");
 const first_search = ref("");
-const items_view = ref("list");
+const items_view = ref("card");
 const itemsPerPage = ref(50);
 const clearingSearch = ref(false);
 const isDragging = ref(false);
@@ -615,6 +626,7 @@ const { getItemRateInfo } = useItemRateInfo({
 
 const {
 	isOverflowing,
+	itemsContainerRef: itemsContainer,
 	cardColumns,
 	cardRowHeight,
 	cardSlotHeight,

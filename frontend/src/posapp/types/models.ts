@@ -68,6 +68,8 @@ export interface InvoiceDoc {
 	is_return?: number;
 	return_against?: string;
 	pos_profile?: string;
+	posa_table_no?: string;
+	posa_order_type?: string;
 	[key: string]: any;
 }
 
@@ -114,6 +116,8 @@ export interface POSProfile {
 	selling_price_list: string;
 	income_account: string;
 	expense_account: string;
+	posa_restaurant_mode?: number;
+	posa_restaurant_tables?: string;
 	[key: string]: any;
 }
 

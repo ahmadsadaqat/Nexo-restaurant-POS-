@@ -1,10 +1,61 @@
 <template>
 	<div class="sticky-header">
 		<v-row class="items">
+			<template v-if="posProfile.posa_restaurant_mode">
+				<v-col cols="6" sm="3" class="pb-0" v-if="orderType !== 'Delivery'">
+					<v-select
+						v-if="restaurantTables.length"
+						:label="__('Table')"
+						:items="restaurantTables"
+						v-model="tableNo"
+						@update:model-value="invoiceStore.setTableNo"
+						variant="solo"
+						class="pos-themed-input"
+						hide-details
+						density="compact"
+					></v-select>
+					<v-text-field
+						v-else
+						:label="__('Table')"
+						v-model="tableNo"
+						@update:model-value="invoiceStore.setTableNo"
+						variant="solo"
+						class="pos-themed-input"
+						hide-details
+						density="compact"
+					></v-text-field>
+				</v-col>
+				<v-col cols="6" sm="3" class="pb-0" v-if="orderType === 'Delivery'">
+					<v-autocomplete
+						:label="__('Rider')"
+						:items="riders"
+						item-title="rider_name"
+						item-value="name"
+						v-model="customRider"
+						@update:model-value="invoiceStore.setCustomRider"
+						variant="solo"
+						class="pos-themed-input"
+						hide-details
+						density="compact"
+					></v-autocomplete>
+				</v-col>
+				<v-col cols="6" sm="3" class="pb-0">
+					<v-select
+						:label="__('Order')"
+						:items="orderTypeOptions"
+						v-model="orderType"
+						@update:model-value="invoiceStore.setOrderType"
+						variant="solo"
+						class="pos-themed-input"
+						hide-details
+						density="compact"
+					></v-select>
+				</v-col>
+			</template>
 			<v-col
 				class="pb-0"
-				:cols="posProfile.posa_input_qty ? 8 : 12"
-				:sm="posProfile.posa_input_qty ? 9 : 12"
+				:cols="posProfile.posa_restaurant_mode ? (posProfile.posa_input_qty ? 8 : 12) : (posProfile.posa_input_qty ? 8 : 12)"
+				:sm="posProfile.posa_restaurant_mode ? (posProfile.posa_input_qty ? 4 : 6) : (posProfile.posa_input_qty ? 9 : 12)"
 			>
 				<div class="search-field-shell">
 					<v-text-field
@@ -166,7 +217,54 @@
 </template>
 
 <script setup>
-import { computed, ref } from "vue";
+import { computed, ref, onMounted, watch } from "vue";
+import { storeToRefs } from "pinia";
+import { useInvoiceStore } from "../../../stores/invoiceStore";
+
+const invoiceStore = useInvoiceStore();
+const { tableNo, orderType, customRider } = storeToRefs(invoiceStore);
+
+const riders = ref([]);
+
+const fetchRiders = async (profile) => {
+	if (typeof frappe !== "undefined" && frappe.call) {
+		try {
+			let filters = {};
+			
+			if (profile?.branch) {
+				const empRes = await frappe.call({
+					method: "frappe.client.get_list",
+					args: {
+						doctype: "Employee",
+						filters: { branch: profile.branch },
+						fields: ["name"],
+						limit_page_length: 0
+					}
+				});
+				const empNames = (empRes.message || []).map(e => e.name);
+				if (empNames.length > 0) {
+					filters.employee = ["in", empNames];
+				} else {
+					riders.value = [];
+					return;
+				}
+			}
+
+			const res = await frappe.call({
+				method: "frappe.client.get_list",
+				args: {
+					doctype: "Rider Profile",
+					filters: filters,
+					fields: ["name", "rider_name"],
+					limit_page_length: 0
+				}
+			});
+			riders.value = res.message || [];
+		} catch (e) {
+			console.error("Failed to fetch riders", e);
+		}
+	}
+};
 
 const props = defineProps({
 	searchInput: { type: String, default: "" },
@@ -221,6 +319,54 @@ const syncItemsCountLabel = computed(() => {
 	const count = normalizedSyncItemsCount.value;
 	const itemLabel = count === 1 ? translate("item synced") : translate("items synced");
 	return `${count.toLocaleString()} ${itemLabel}`;
+});
+
+const restaurantTables = ref([]);
+
+const fetchTables = async (profile) => {
+	if (typeof frappe !== "undefined" && frappe.call && profile?.branch) {
+		try {
+			const floorsRes = await frappe.call({
+				method: "frappe.client.get_list",
+				args: {
+					doctype: "Restaurant Floor",
+					filters: { branch: profile.branch },
+					fields: ["name"],
+					limit_page_length: 0
+				}
+			});
+			const floorNames = (floorsRes.message || []).map(f => f.name);
+			if (floorNames.length > 0) {
+				const tablesRes = await frappe.call({
+					method: "frappe.client.get_list",
+					args: {
+						doctype: "Table",
+						filters: { floor: ["in", floorNames] },
+						fields: ["name", "table_name"],
+						limit_page_length: 0
+					}
+				});
+				restaurantTables.value = (tablesRes.message || []).map(t => t.table_name || t.name);
+			} else {
+				restaurantTables.value = [];
+			}
+		} catch (e) {
+			console.error("Failed to fetch tables", e);
+		}
+	} else if (profile?.posa_restaurant_tables) {
+		restaurantTables.value = (profile.posa_restaurant_tables || "").split(",").map(t => t.trim()).filter(Boolean);
+	}
+};
+
+watch(() => props.posProfile, (newVal) => {
+	fetchTables(newVal);
+	fetchRiders(newVal);
+}, { immediate: true, deep: true });
+
+const orderTypeOptions = computed(() => {
+	const typesStr = props.posProfile?.posa_order_types || "Dine In, Takeaway, Delivery";
+	const types = typesStr.split(",").map(t => t.trim()).filter(t => t);
+	return types.map(t => ({ title: translate(t), value: t }));
 });
 
 const blurTarget = (event) => {

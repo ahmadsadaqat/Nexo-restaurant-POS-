@@ -157,7 +157,7 @@ defineExpose({ scrollToItem, getScrollerElement, scrollerRef });
 
 .items-card-grid {
 	display: grid;
-	grid-template-columns: repeat(3, 1fr);
+	grid-template-columns: repeat(4, 1fr);
 	gap: 16px;
 	padding: 16px;
 	height: calc(100% - 80px);

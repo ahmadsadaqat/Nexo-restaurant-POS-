@@ -113,6 +113,19 @@
 				{{ __("Customer Screen") }}
 			</v-btn>
 		</v-col>
+		<v-col cols="12" sm="6" v-if="pos_profile.posa_enable_kot == 1">
+			<v-btn
+				block
+				color="deep-orange"
+				theme="dark"
+				prepend-icon="mdi-printer-pos"
+				@click="$emit('print-kot')"
+				class="summary-btn"
+				data-pos-keyboard-target="invoice-action"
+			>
+				{{ __("KOT PRINT") }}
+			</v-btn>
+		</v-col>
 		<v-col cols="12">
 			<v-btn
 				block
@@ -162,6 +175,7 @@ defineEmits([
 	"print-draft",
 	"show-payment",
 	"open-customer-display",
+	"print-kot",
 ]);
 
 const __ = window.__;
