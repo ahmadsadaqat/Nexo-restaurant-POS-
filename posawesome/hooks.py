@@ -206,7 +206,6 @@ fixtures = [
                     "POS Profile-posa_pos_awesome_settings",
                     "POS Profile-posa_restaurant_mode",
                     "POS Profile-posa_order_types",
-                    "POS Profile-posa_restaurant_tables",
                     "POS Invoice-posa_table_no",
                     "POS Invoice-posa_order_type",
                     "Sales Invoice-posa_table_no",

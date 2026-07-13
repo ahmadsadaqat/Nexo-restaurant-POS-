@@ -324,37 +324,41 @@ const syncItemsCountLabel = computed(() => {
 const restaurantTables = ref([]);
 
 const fetchTables = async (profile) => {
-	if (typeof frappe !== "undefined" && frappe.call && profile?.branch) {
+	if (typeof frappe !== "undefined" && frappe.call) {
 		try {
-			const floorsRes = await frappe.call({
-				method: "frappe.client.get_list",
-				args: {
-					doctype: "Restaurant Floor",
-					filters: { branch: profile.branch },
-					fields: ["name"],
-					limit_page_length: 0
-				}
-			});
-			const floorNames = (floorsRes.message || []).map(f => f.name);
-			if (floorNames.length > 0) {
-				const tablesRes = await frappe.call({
+			let filters = {};
+			if (profile?.branch) {
+				const floorsRes = await frappe.call({
 					method: "frappe.client.get_list",
 					args: {
-						doctype: "Table",
-						filters: { floor: ["in", floorNames] },
-						fields: ["name", "table_name"],
+						doctype: "Restaurant Floor",
+						filters: { branch: profile.branch },
+						fields: ["name"],
 						limit_page_length: 0
 					}
 				});
-				restaurantTables.value = (tablesRes.message || []).map(t => t.table_name || t.name);
-			} else {
-				restaurantTables.value = [];
+				const floorNames = (floorsRes.message || []).map(f => f.name);
+				if (floorNames.length > 0) {
+					filters = { floor: ["in", floorNames] };
+				} else {
+					restaurantTables.value = [];
+					return;
+				}
 			}
+
+			const tablesRes = await frappe.call({
+				method: "frappe.client.get_list",
+				args: {
+					doctype: "Table",
+					filters: filters,
+					fields: ["name", "table_name"],
+					limit_page_length: 0
+				}
+			});
+			restaurantTables.value = (tablesRes.message || []).map(t => t.table_name || t.name);
 		} catch (e) {
 			console.error("Failed to fetch tables", e);
 		}
-	} else if (profile?.posa_restaurant_tables) {
-		restaurantTables.value = (profile.posa_restaurant_tables || "").split(",").map(t => t.trim()).filter(Boolean);
 	}
 };
 
