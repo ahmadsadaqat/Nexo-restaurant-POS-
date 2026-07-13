@@ -7,6 +7,8 @@
 						v-if="restaurantTables.length"
 						:label="__('Table')"
 						:items="restaurantTables"
+						item-title="label"
+						item-value="name"
 						v-model="tableNo"
 						@update:model-value="invoiceStore.setTableNo"
 						variant="solo"
@@ -373,11 +375,18 @@ const fetchTables = async (profile) => {
 				args: {
 					doctype: "Table",
 					filters: filters,
-					fields: ["name", "table_name"],
+					fields: ["name", "table_name", "status"],
 					limit_page_length: 0
 				}
 			});
-			restaurantTables.value = (tablesRes.message || []).map(t => t.table_name || t.name);
+			restaurantTables.value = (tablesRes.message || []).map(t => {
+				const id = t.table_name || t.name;
+				const statusText = t.status ? ` - ${t.status}` : '';
+				return {
+					name: id,
+					label: `${id}${statusText}`
+				};
+			});
 		} catch (e) {
 			console.error("Failed to fetch tables", e);
 		}
