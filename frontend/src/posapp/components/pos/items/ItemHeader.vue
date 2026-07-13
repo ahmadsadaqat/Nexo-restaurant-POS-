@@ -229,14 +229,25 @@ const riders = ref([]);
 const fetchRiders = async (profile) => {
 	if (typeof frappe !== "undefined" && frappe.call) {
 		try {
+			let branch = profile?.branch || profile?.custom_branch;
+			if (!branch && profile?.name) {
+				const profileDoc = await frappe.call({
+					method: "frappe.client.get",
+					args: { doctype: "POS Profile", name: profile.name }
+				});
+				if (profileDoc && profileDoc.message) {
+					branch = profileDoc.message.branch || profileDoc.message.custom_branch;
+				}
+			}
+
 			let filters = {};
 			
-			if (profile?.branch) {
+			if (branch) {
 				const empRes = await frappe.call({
 					method: "frappe.client.get_list",
 					args: {
 						doctype: "Employee",
-						filters: { branch: profile.branch },
+						filters: { branch: branch },
 						fields: ["name"],
 						limit_page_length: 0
 					}
@@ -326,13 +337,24 @@ const restaurantTables = ref([]);
 const fetchTables = async (profile) => {
 	if (typeof frappe !== "undefined" && frappe.call) {
 		try {
+			let branch = profile?.branch || profile?.custom_branch;
+			if (!branch && profile?.name) {
+				const profileDoc = await frappe.call({
+					method: "frappe.client.get",
+					args: { doctype: "POS Profile", name: profile.name }
+				});
+				if (profileDoc && profileDoc.message) {
+					branch = profileDoc.message.branch || profileDoc.message.custom_branch;
+				}
+			}
+
 			let filters = {};
-			if (profile?.branch) {
+			if (branch) {
 				const floorsRes = await frappe.call({
 					method: "frappe.client.get_list",
 					args: {
 						doctype: "Restaurant Floor",
-						filters: { branch: profile.branch },
+						filters: { branch: branch },
 						fields: ["name"],
 						limit_page_length: 0
 					}
