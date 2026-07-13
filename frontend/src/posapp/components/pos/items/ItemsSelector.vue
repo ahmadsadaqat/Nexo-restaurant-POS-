@@ -7,6 +7,13 @@
 			:details="scanErrorDetails"
 			@acknowledge="acknowledgeScanError"
 		/>
+		<AddonDialog
+			v-model="addonDialog"
+			:item="selectedItemForAddon"
+			:pos-profile="pos_profile"
+			@confirm="addMainItemAndSelectedAddons"
+			@skip="addMainItemOnly"
+		/>
 		<v-card
 			:class="[
 				'selection selection-card mx-auto my-0 py-0 mt-3 pos-card dynamic-card resizable pos-themed-card',
@@ -230,6 +237,7 @@ import ItemsSelectorCards from "./ItemsSelectorCards.vue";
 import ItemsSelectorTable from "./ItemsSelectorTable.vue";
 import NewItemDialog from "./NewItemDialog.vue";
 import ScanErrorDialog from "./ScanErrorDialog.vue";
+import AddonDialog from "./AddonDialog.vue";
 
 import { useResponsive } from "../../../composables/core/useResponsive";
 import { useRtl } from "../../../composables/core/useRtl";
@@ -320,6 +328,9 @@ const isInitialized = ref(false);
 const initTimeout = ref<ReturnType<typeof setTimeout> | null>(null);
 const initError = ref<unknown>(null);
 const selectedItems = ref(new Map<string, any>());
+const addonDialog = ref(false);
+const selectedItemForAddon = ref<any>(null);
+const addonContextForAddition = ref<any>(null);
 const selectedKeys = computed(() => new Set(selectedItems.value.keys()));
 const selectedItemsArray = computed(() => Array.from(selectedItems.value.values()));
 let stopItemInitializationWatcher: (() => void) | null = null;
@@ -650,6 +661,101 @@ const itemSelectorLayoutLifecycle = useItemsSelectorLayoutLifecycle({
 });
 
 // 5. Core Methods
+const add_item_to_cart_directly = async (item: any, requestedQty: number, options: any = {}) => {
+	const context = {
+		pos_profile: pos_profile.value,
+		stock_settings: stock_settings.value,
+		customer: selectedCustomer.value,
+		selected_currency: selected_currency.value,
+		exchange_rate: selected_exchange_rate.value,
+		conversion_rate: selected_conversion_rate.value,
+		price_list_currency: item.original_currency || item.price_list_currency || pos_profile.value?.currency,
+		itemCurrencyUtils,
+		invoiceStore,
+		eventBus,
+		itemDetailFetcher,
+		items: invoiceStore.items,
+		isReturnInvoice: isReturnInvoice.value,
+		...options,
+		new_line: typeof options?.new_line === "boolean" ? options.new_line : !!new_line.value,
+	};
+
+	const isValid = await cartValidation.validateCartItem(
+		item,
+		requestedQty,
+		pos_profile.value,
+		stock_settings.value,
+		null,
+		blockSaleBeyondAvailableQty.value,
+		!options.suppressNegativeWarning,
+		true,
+		isReturnInvoice.value,
+		deferStockValidationToPayment.value,
+	);
+
+	if (isValid) {
+		await useItemAddition().prepareItemForCart(item, requestedQty, context);
+		const addedLine = await useItemAddition().addItem(item, context);
+		if (eventBus && typeof eventBus.emit === "function") {
+			eventBus.emit("apply_pricing_rules");
+		}
+		qty.value = 1;
+		if (addedLine && eventBus && typeof eventBus.emit === "function") {
+			const focusedLine: any = addedLine;
+			window.setTimeout(() => {
+				eventBus.emit("focus_cart_item_qty", {
+					item: focusedLine,
+					rowId: focusedLine?.posa_row_id,
+					itemCode: focusedLine?.item_code || item?.item_code,
+				});
+			}, 0);
+		}
+	}
+};
+
+const addMainItemAndSelectedAddons = async (selectedAddons: any[]) => {
+	addonDialog.value = false;
+	const mainItem = selectedItemForAddon.value;
+	const contextAddition = addonContextForAddition.value;
+	if (!mainItem || !contextAddition) return;
+
+	const { options, requestedQty } = contextAddition;
+
+	// Add main item
+	await add_item_to_cart_directly(mainItem, requestedQty, options);
+
+	// Add each addon as separate line items
+	for (const addon of selectedAddons) {
+		const addonItem = items.value.find((it: any) => it.item_code === addon.item_code) || {
+			item_code: addon.item_code,
+			item_name: addon.item_name,
+			price_list_rate: addon.price,
+			rate: addon.price,
+			stock_uom: "Nos",
+		};
+		addonItem.price_list_rate = addon.price;
+		addonItem.rate = addon.price;
+
+		await add_item_to_cart_directly(addonItem, 1, { new_line: true });
+	}
+
+	selectedItemForAddon.value = null;
+	addonContextForAddition.value = null;
+};
+
+const addMainItemOnly = async () => {
+	addonDialog.value = false;
+	const mainItem = selectedItemForAddon.value;
+	const contextAddition = addonContextForAddition.value;
+	if (!mainItem || !contextAddition) return;
+
+	const { options, requestedQty } = contextAddition;
+	await add_item_to_cart_directly(mainItem, requestedQty, options);
+
+	selectedItemForAddon.value = null;
+	addonContextForAddition.value = null;
+};
+
 const add_item = async (item, optionsOrQty: any = {}) => {
 	if (props.context === "pos") {
 		let options: any = typeof optionsOrQty === "object" ? optionsOrQty : { qty: optionsOrQty };
@@ -674,55 +780,18 @@ const add_item = async (item, optionsOrQty: any = {}) => {
 			return;
 		}
 
-		const context = {
-			pos_profile: pos_profile.value,
-			stock_settings: stock_settings.value,
-			customer: selectedCustomer.value,
-			selected_currency: selected_currency.value,
-			exchange_rate: selected_exchange_rate.value,
-			conversion_rate: selected_conversion_rate.value,
-			price_list_currency: item.original_currency || item.price_list_currency || pos_profile.value?.currency,
-			itemCurrencyUtils,
-			invoiceStore,
-			eventBus,
-			itemDetailFetcher,
-			items: invoiceStore.items,
-			isReturnInvoice: isReturnInvoice.value,
-			...options,
-			new_line: typeof options?.new_line === "boolean" ? options.new_line : !!new_line.value,
-		};
-
-		const isValid = await cartValidation.validateCartItem(
-			item,
-			requestedQty,
-			pos_profile.value,
-			stock_settings.value,
-			null,
-			blockSaleBeyondAvailableQty.value,
-			!options.suppressNegativeWarning,
-			true,
-			isReturnInvoice.value,
-			deferStockValidationToPayment.value,
-		);
-
-		if (isValid) {
-			await useItemAddition().prepareItemForCart(item, requestedQty, context);
-			const addedLine = await useItemAddition().addItem(item, context);
-			if (eventBus && typeof eventBus.emit === "function") {
-				eventBus.emit("apply_pricing_rules");
-			}
-			qty.value = 1;
-			if (addedLine && eventBus && typeof eventBus.emit === "function") {
-				const focusedLine: any = addedLine;
-				window.setTimeout(() => {
-					eventBus.emit("focus_cart_item_qty", {
-						item: focusedLine,
-						rowId: focusedLine?.posa_row_id,
-						itemCode: focusedLine?.item_code || item?.item_code,
-					});
-				}, 0);
-			}
+		// Intercept items with addons
+		if (item.custom_has_addons && (item.custom_has_addons == 1 || item.custom_has_addons === true || item.custom_has_addons === "1")) {
+			selectedItemForAddon.value = item;
+			addonContextForAddition.value = {
+				options,
+				requestedQty
+			};
+			addonDialog.value = true;
+			return;
 		}
+
+		await add_item_to_cart_directly(item, requestedQty, options);
 	} else {
 		emit("add-item", item);
 	}

@@ -210,6 +210,8 @@ def _build_search_plan(
         "brand",
         "allow_negative_stock",
     ]
+    if frappe.db.has_column("Item", "custom_has_addons"):
+        fields.append("custom_has_addons")
     if include_description:
         fields.append("description")
     if include_image:
@@ -526,6 +528,8 @@ def _get_hot_catalog_fields(include_description: bool, include_image: bool) -> L
         "brand",
         "allow_negative_stock",
     ]
+    if frappe.db.has_column("Item", "custom_has_addons"):
+        fields.append("custom_has_addons")
     if include_description:
         fields.append("description")
     if include_image:
