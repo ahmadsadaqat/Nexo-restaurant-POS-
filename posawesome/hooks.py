@@ -226,6 +226,8 @@ fixtures = [
                     "POS Profile-posa_allow_partial_payment",
                     "POS Profile-posa_allow_credit_sale",
                     "POS Profile-posa_pos_awesome_advance_settings",
+                    "POS Profile-posa_allow_multi_currency",
+                    "POS Profile-posa_decimal_precision",
                     "Batch-posa_batch_price",
                     "POS Profile-posa_max_discount_allowed",
                     "POS Profile-posa_allow_return",
@@ -400,19 +402,6 @@ fixtures = [
                     "Sales Invoice Reference-sales_invoice-reqd",
                     "Sales Invoice-update_outstanding_for_self-default",
                 ),
-            ]
-        ],
-    },
-    {
-        "doctype": "Custom Field",
-        "filters": [
-            [
-                "name",
-                "in",
-                [
-                    "POS Profile-posa_allow_multi_currency",
-                    "POS Profile-posa_decimal_precision",
-                ],
             ]
         ],
     },
