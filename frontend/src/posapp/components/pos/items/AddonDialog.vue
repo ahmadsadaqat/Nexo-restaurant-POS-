@@ -110,7 +110,7 @@ const fetchAddons = async () => {
 	selectedAddons.value = [];
 	try {
 		const res = await frappe.call({
-			method: "nexo_ota.nexo_ota.api.get_item_addons",
+			method: "nexo_ota.api.get_item_addons",
 			args: {
 				item_code: props.item.item_code,
 				price_list: props.posProfile?.selling_price_list || "Standard Selling",
