@@ -2190,78 +2190,91 @@ onMounted(() => {
 	_shortcutHandlers.value.handlePaymentShortcut = handlePaymentShortcut.bind(this);
 	document.addEventListener("keydown", _shortcutHandlers.value.handlePaymentShortcut);
 
+	const handleSendInvoiceDocPayment = (doc) => {
+		invoiceStore.setInvoiceDoc(doc);
+		void refreshPaymentCustomerInfo(doc);
+		paid_change.value = flt(doc.paid_change || 0, currency_precision.value);
+		credit_change.value = flt(doc.credit_change || 0, currency_precision.value);
+		last_payment_change_was_cash.value = null;
+		is_credit_sale.value = false;
+		is_write_off_change.value = false;
+
+		// Decide the credit-return default ONCE, when the return is first
+		// loaded, so reopening the dialog / a failed submit never overrides a
+		// manual toggle change by the cashier.
+		if (doc.is_return) {
+			applyReturnCreditDefault(doc);
+		}
+
+		const initializedPayment = ensurePaymentLinesInitialized(doc);
+
+		if (doc.is_return) {
+			is_return.value = true;
+			// is_credit_return default was applied above on load; don't override.
+		} else if (initializedPayment) {
+			is_credit_return.value = false;
+		}
+		initializeReturnValidity(doc);
+		loyalty_amount.value = 0;
+		redeemed_customer_credit.value = 0;
+		resetGiftCardState({ clearPayment: true });
+		if (doc.customer) {
+			get_addresses();
+		}
+		get_sales_person_names();
+	};
+
+	const handleRegisterPosProfile = (data) => {
+		pos_profile.value = data.pos_profile;
+		stock_settings.value = data.stock_settings;
+	};
+
+	const handleAddTheNewAddress = (data) => {
+		const normalized = normalizeAddress(data);
+		if (normalized) {
+			const existing = addresses.value.filter((addr) => addr.name !== normalized.name);
+			addresses.value = [...existing, normalized];
+			if (invoice_doc.value) {
+				invoice_doc.value.shipping_address_name = normalized.name;
+			}
+		}
+	};
+
+	const handleSetPosSettings = (data) => {
+		pos_settings.value = data || {};
+		if (invoice_doc.value && !invoice_doc.value.is_return) {
+			initializeReturnValidity(invoice_doc.value);
+		}
+	};
+
+	const handleSetMpesaPayment = (data) => {
+		set_mpesa_payment(data);
+	};
+
+	const handleClearInvoice = () => {
+		invoiceStore.clear();
+		invoiceStore.resetPostingDate();
+		is_return.value = false;
+		is_credit_return.value = false;
+		return_valid_upto_date.value = null;
+		resetGiftCardState({ clearPayment: true });
+	};
+
+	const handleSyncPendingInvoices = () => syncStore.syncPendingInvoices();
+
 	syncStore.syncPendingInvoices();
-	eventBus.on("network-online", () => syncStore.syncPendingInvoices());
-	eventBus.on("server-online", () => syncStore.syncPendingInvoices());
+	eventBus.on("network-online", handleSyncPendingInvoices);
+	eventBus.on("server-online", handleSyncPendingInvoices);
 
 	if (eventBus) {
-		eventBus.on("send_invoice_doc_payment", (doc) => {
-			invoiceStore.setInvoiceDoc(doc);
-			void refreshPaymentCustomerInfo(doc);
-			paid_change.value = flt(doc.paid_change || 0, currency_precision.value);
-			credit_change.value = flt(doc.credit_change || 0, currency_precision.value);
-			last_payment_change_was_cash.value = null;
-			is_credit_sale.value = false;
-			is_write_off_change.value = false;
-
-			// Decide the credit-return default ONCE, when the return is first
-			// loaded, so reopening the dialog / a failed submit never overrides a
-			// manual toggle change by the cashier.
-			if (doc.is_return) {
-				applyReturnCreditDefault(doc);
-			}
-
-			const initializedPayment = ensurePaymentLinesInitialized(doc);
-
-			if (doc.is_return) {
-				is_return.value = true;
-				// is_credit_return default was applied above on load; don't override.
-			} else if (initializedPayment) {
-				is_credit_return.value = false;
-			}
-			initializeReturnValidity(doc);
-			loyalty_amount.value = 0;
-			redeemed_customer_credit.value = 0;
-			resetGiftCardState({ clearPayment: true });
-			if (doc.customer) {
-				get_addresses();
-			}
-			get_sales_person_names();
-		});
-
-		eventBus.on("register_pos_profile", (data) => {
-			pos_profile.value = data.pos_profile;
-			stock_settings.value = data.stock_settings;
-		});
-		eventBus.on("add_the_new_address", (data) => {
-			const normalized = normalizeAddress(data);
-			if (normalized) {
-				const existing = addresses.value.filter((addr) => addr.name !== normalized.name);
-				addresses.value = [...existing, normalized];
-				if (invoice_doc.value) {
-					invoice_doc.value.shipping_address_name = normalized.name;
-				}
-			}
-		});
-		eventBus.on("set_pos_settings", (data) => {
-			pos_settings.value = data || {};
-			if (invoice_doc.value && !invoice_doc.value.is_return) {
-				initializeReturnValidity(invoice_doc.value);
-			}
-		});
-		eventBus.on("set_mpesa_payment", (data) => {
-			set_mpesa_payment(data);
-		});
+		eventBus.on("send_invoice_doc_payment", handleSendInvoiceDocPayment);
+		eventBus.on("register_pos_profile", handleRegisterPosProfile);
+		eventBus.on("add_the_new_address", handleAddTheNewAddress);
+		eventBus.on("set_pos_settings", handleSetPosSettings);
+		eventBus.on("set_mpesa_payment", handleSetMpesaPayment);
 		eventBus.on("queue_submit_payment_shortcut", queueShortcutSubmit);
 		eventBus.on("submit_payment_shortcut", handleSubmitPaymentShortcut);
-		eventBus.on("clear_invoice", () => {
-			invoiceStore.clear();
-			invoiceStore.resetPostingDate();
-			is_return.value = false;
-			is_credit_return.value = false;
-			return_valid_upto_date.value = null;
-			resetGiftCardState({ clearPayment: true });
-		});
+		eventBus.on("clear_invoice", handleClearInvoice);
 	}
 
 	if (isPaymentOpen.value) {
@@ -2270,16 +2283,16 @@ onMounted(() => {
 });
 
 onBeforeUnmount(() => {
-	eventBus.off("send_invoice_doc_payment");
-	eventBus.off("register_pos_profile");
-	eventBus.off("add_the_new_address");
-	eventBus.off("set_pos_settings");
-	eventBus.off("set_mpesa_payment");
+	eventBus.off("send_invoice_doc_payment", handleSendInvoiceDocPayment);
+	eventBus.off("register_pos_profile", handleRegisterPosProfile);
+	eventBus.off("add_the_new_address", handleAddTheNewAddress);
+	eventBus.off("set_pos_settings", handleSetPosSettings);
+	eventBus.off("set_mpesa_payment", handleSetMpesaPayment);
 	eventBus.off("queue_submit_payment_shortcut", queueShortcutSubmit);
 	eventBus.off("submit_payment_shortcut", handleSubmitPaymentShortcut);
-	eventBus.off("clear_invoice");
-	eventBus.off("network-online");
-	eventBus.off("server-online");
+	eventBus.off("clear_invoice", handleClearInvoice);
+	eventBus.off("network-online", handleSyncPendingInvoices);
+	eventBus.off("server-online", handleSyncPendingInvoices);
 	clearBackgroundStatusCheck();
 
 	if (_shortcutHandlers.value.handlePaymentShortcut) {

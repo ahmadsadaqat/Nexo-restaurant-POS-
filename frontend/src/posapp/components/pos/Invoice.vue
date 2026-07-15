@@ -971,13 +971,19 @@ export default {
 				this.toastStore.show({ message: this.__("Cart is empty"), color: "error" });
 				return;
 			}
-			
+
 			if (this.invoiceStore.orderType === "Dine In" && !this.invoiceStore.tableNo) {
-				this.toastStore.show({ message: this.__("Please select a table for Dine In orders"), color: "error" });
+				this.toastStore.show({
+					message: this.__("Please select a table for Dine In orders"),
+					color: "error",
+				});
 				return;
 			}
 			if (this.invoiceStore.orderType === "Delivery" && !this.invoiceStore.customRider) {
-				this.toastStore.show({ message: this.__("Please assign a rider for Delivery orders"), color: "error" });
+				this.toastStore.show({
+					message: this.__("Please assign a rider for Delivery orders"),
+					color: "error",
+				});
 				return;
 			}
 
@@ -1009,7 +1015,8 @@ export default {
 					items: itemsToPrint,
 					table_no: this.invoiceStore.tableNo,
 					order_type: this.invoiceStore.orderType,
-					branch: this.pos_profile.custom_branch || this.pos_profile.branch || this.pos_profile.company,
+					branch:
+						this.pos_profile.custom_branch || this.pos_profile.branch || this.pos_profile.company,
 					invoice_no: saved_invoice_name,
 				};
 				const response = await window.frappe.call({
@@ -1019,9 +1026,22 @@ export default {
 					},
 				});
 				if (response.message && response.message.success) {
-					this.toastStore.show({ message: this.__("KOT Created: ") + response.message.name, color: "success" });
+					this.toastStore.show({
+						message: this.__("KOT Created: ") + response.message.name,
+						color: "success",
+					});
+					this.eventBus.emit("refresh_tables", {
+						tableNo: this.invoiceStore.tableNo,
+						status: "Occupied",
+					});
+					this.eventBus.emit("clear_invoice");
 				} else {
-					this.toastStore.show({ message: this.__("Failed to create KOT: ") + (response.message ? response.message.message : ""), color: "error" });
+					this.toastStore.show({
+						message:
+							this.__("Failed to create KOT: ") +
+							(response.message ? response.message.message : ""),
+						color: "error",
+					});
 				}
 			} catch (e) {
 				console.error(e);

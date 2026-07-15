@@ -4,7 +4,12 @@
 			<!-- Item Name Column -->
 			<td v-if="column.key === 'item_name'" class="text-start" :data-column-key="'item_name'">
 				<div class="d-flex align-center">
-					<span>{{ item.item_name }}</span>
+					<div class="d-flex flex-column">
+						<span>{{ item.item_name }}</span>
+						<span v-if="item.addon_parent_item_name" class="text-caption text-medium-emphasis">
+							{{ __("Addon of") }} {{ item.addon_parent_item_name }}
+						</span>
+					</div>
 					<v-chip v-if="item.is_bundle" color="secondary" size="x-small" class="ml-1">
 						{{ __("Bundle") }}
 					</v-chip>
@@ -394,7 +399,7 @@
 						{{ isExpanded ? "mdi-chevron-up" : "mdi-chevron-down" }}
 					</v-icon>
 				</v-btn>
-		</td>
+			</td>
 		</template>
 	</tr>
 </template>
@@ -482,6 +487,7 @@ const memoDeps = computed(() => {
 		props.item.discount_percentage,
 		props.item.uom,
 		props.item.item_name,
+		props.item.addon_parent_item_name,
 		props.item.name_overridden,
 		props.item.pricing_rule_badge,
 		props.item.batch_no_is_expired,

@@ -182,3 +182,28 @@ def get_tax_template_for_payment(pos_profile, payments):
             result["tax_template"] = None
 
     return result
+
+
+@frappe.whitelist()
+def test_sales_invoice_table():
+    import frappe
+    # reset status
+    frappe.db.set_value("Table", "Table No. 3", "status", "Available")
+    frappe.db.commit()
+    doc = frappe.get_doc({
+        "doctype": "Sales Invoice",
+        "company": "Nexo ERP (Demo)",
+        "customer": "Test Lead Name",
+        "posa_table_no": "Table No. 3",
+        "is_pos": 1,
+        "items": [{
+            "item_code": "Plumber",
+            "qty": 1,
+            "rate": 10
+        }]
+    })
+    doc.insert(ignore_permissions=True)
+    frappe.db.commit()
+    status = frappe.db.get_value("Table", "Table No. 3", "status")
+    return {"status_after_insert": status, "docname": doc.name}
+

@@ -56,8 +56,24 @@
 			</template>
 			<v-col
 				class="pb-0"
-				:cols="posProfile.posa_restaurant_mode ? (posProfile.posa_input_qty ? 8 : 12) : (posProfile.posa_input_qty ? 8 : 12)"
-				:sm="posProfile.posa_restaurant_mode ? (posProfile.posa_input_qty ? 4 : 6) : (posProfile.posa_input_qty ? 9 : 12)"
+				:cols="
+					posProfile.posa_restaurant_mode
+						? posProfile.posa_input_qty
+							? 8
+							: 12
+						: posProfile.posa_input_qty
+							? 8
+							: 12
+				"
+				:sm="
+					posProfile.posa_restaurant_mode
+						? posProfile.posa_input_qty
+							? 4
+							: 6
+						: posProfile.posa_input_qty
+							? 9
+							: 12
+				"
 			>
 				<div class="search-field-shell">
 					<v-text-field
@@ -219,9 +235,10 @@
 </template>
 
 <script setup>
-import { computed, ref, onMounted, watch } from "vue";
+import { computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
 import { storeToRefs } from "pinia";
 import { useInvoiceStore } from "../../../stores/invoiceStore";
+import { bus } from "../../../bus";
 
 const invoiceStore = useInvoiceStore();
 const { tableNo, orderType, customRider } = storeToRefs(invoiceStore);
@@ -235,7 +252,7 @@ const fetchRiders = async (profile) => {
 			if (!branch && profile?.name) {
 				const profileDoc = await frappe.call({
 					method: "frappe.client.get",
-					args: { doctype: "POS Profile", name: profile.name }
+					args: { doctype: "POS Profile", name: profile.name },
 				});
 				if (profileDoc && profileDoc.message) {
 					branch = profileDoc.message.branch || profileDoc.message.custom_branch;
@@ -243,7 +260,7 @@ const fetchRiders = async (profile) => {
 			}
 
 			let filters = {};
-			
+
 			if (branch) {
 				const empRes = await frappe.call({
 					method: "frappe.client.get_list",
@@ -251,10 +268,10 @@ const fetchRiders = async (profile) => {
 						doctype: "Employee",
 						filters: { branch: branch },
 						fields: ["name"],
-						limit_page_length: 0
-					}
+						limit_page_length: 0,
+					},
 				});
-				const empNames = (empRes.message || []).map(e => e.name);
+				const empNames = (empRes.message || []).map((e) => e.name);
 				if (empNames.length > 0) {
 					filters.employee = ["in", empNames];
 				} else {
@@ -269,8 +286,8 @@ const fetchRiders = async (profile) => {
 					doctype: "Rider Profile",
 					filters: filters,
 					fields: ["name", "rider_name"],
-					limit_page_length: 0
-				}
+					limit_page_length: 0,
+				},
 			});
 			riders.value = res.message || [];
 		} catch (e) {
@@ -336,6 +353,24 @@ const syncItemsCountLabel = computed(() => {
 
 const restaurantTables = ref([]);
 
+const updateTableLabel = (tableNo, status) => {
+	if (!tableNo) {
+		return;
+	}
+
+	restaurantTables.value = restaurantTables.value.map((table) => {
+		if (table.name !== tableNo) {
+			return table;
+		}
+
+		const statusText = status ? ` - ${status}` : "";
+		return {
+			...table,
+			label: `${tableNo}${statusText}`,
+		};
+	});
+};
+
 const fetchTables = async (profile) => {
 	if (typeof frappe !== "undefined" && frappe.call) {
 		try {
@@ -343,7 +378,7 @@ const fetchTables = async (profile) => {
 			if (!branch && profile?.name) {
 				const profileDoc = await frappe.call({
 					method: "frappe.client.get",
-					args: { doctype: "POS Profile", name: profile.name }
+					args: { doctype: "POS Profile", name: profile.name },
 				});
 				if (profileDoc && profileDoc.message) {
 					branch = profileDoc.message.branch || profileDoc.message.custom_branch;
@@ -358,10 +393,10 @@ const fetchTables = async (profile) => {
 						doctype: "Restaurant Floor",
 						filters: { branch: branch },
 						fields: ["name"],
-						limit_page_length: 0
-					}
+						limit_page_length: 0,
+					},
 				});
-				const floorNames = (floorsRes.message || []).map(f => f.name);
+				const floorNames = (floorsRes.message || []).map((f) => f.name);
 				if (floorNames.length > 0) {
 					filters = { floor: ["in", floorNames] };
 				} else {
@@ -376,15 +411,16 @@ const fetchTables = async (profile) => {
 					doctype: "Table",
 					filters: filters,
 					fields: ["name", "table_name", "status"],
-					limit_page_length: 0
-				}
+					limit_page_length: 0,
+				},
 			});
-			restaurantTables.value = (tablesRes.message || []).map(t => {
+			console.log("[ItemHeader] fetchTables got tables from server:", tablesRes.message);
+			restaurantTables.value = (tablesRes.message || []).map((t) => {
 				const id = t.table_name || t.name;
-				const statusText = t.status ? ` - ${t.status}` : '';
+				const statusText = t.status ? ` - ${t.status}` : "";
 				return {
 					name: id,
-					label: `${id}${statusText}`
+					label: `${id}${statusText}`,
 				};
 			});
 		} catch (e) {
@@ -393,15 +429,45 @@ const fetchTables = async (profile) => {
 	}
 };
 
-watch(() => props.posProfile, (newVal) => {
-	fetchTables(newVal);
-	fetchRiders(newVal);
-}, { immediate: true, deep: true });
+watch(
+	() => props.posProfile,
+	(newVal) => {
+		fetchTables(newVal);
+		fetchRiders(newVal);
+	},
+	{ immediate: true, deep: true },
+);
+
+const handleClearInvoiceEvent = () => {
+	console.log("[ItemHeader] Received clear_invoice event, calling fetchTables");
+	fetchTables(props.posProfile);
+};
+
+const handleRefreshTablesEvent = (payload) => {
+	console.log("[ItemHeader] Received refresh_tables event, refreshing table state");
+	updateTableLabel(payload?.tableNo, payload?.status || "Occupied");
+	window.setTimeout(() => {
+		fetchTables(props.posProfile);
+	}, 150);
+};
+
+onMounted(() => {
+	bus.on("clear_invoice", handleClearInvoiceEvent);
+	bus.on("refresh_tables", handleRefreshTablesEvent);
+});
+
+onBeforeUnmount(() => {
+	bus.off("clear_invoice", handleClearInvoiceEvent);
+	bus.off("refresh_tables", handleRefreshTablesEvent);
+});
 
 const orderTypeOptions = computed(() => {
 	const typesStr = props.posProfile?.posa_order_types || "Dine In, Takeaway, Delivery";
-	const types = typesStr.split(",").map(t => t.trim()).filter(t => t);
-	return types.map(t => ({ title: translate(t), value: t }));
+	const types = typesStr
+		.split(",")
+		.map((t) => t.trim())
+		.filter((t) => t);
+	return types.map((t) => ({ title: translate(t), value: t }));
 });
 
 const blurTarget = (event) => {

@@ -81,11 +81,7 @@
 				/>
 
 				<v-card flat class="selector-section-card selector-results-card pos-themed-card">
-					<v-slide-group
-						v-model="item_group"
-						show-arrows
-						class="px-2 pt-4 pb-4"
-					>
+					<v-slide-group v-model="item_group" show-arrows class="px-2 pt-4 pb-4">
 						<v-slide-group-item
 							v-for="group in items_group"
 							:key="group"
@@ -187,7 +183,7 @@
 						@click="emitAddSelected"
 						class="px-6"
 					>
-					{{ __('Add Selected') }} ({{ selectedItems.size }})
+						{{ __("Add Selected") }} ({{ selectedItems.size }})
 					</v-btn>
 				</div>
 			</v-expand-transition>
@@ -669,7 +665,8 @@ const add_item_to_cart_directly = async (item: any, requestedQty: number, option
 		selected_currency: selected_currency.value,
 		exchange_rate: selected_exchange_rate.value,
 		conversion_rate: selected_conversion_rate.value,
-		price_list_currency: item.original_currency || item.price_list_currency || pos_profile.value?.currency,
+		price_list_currency:
+			item.original_currency || item.price_list_currency || pos_profile.value?.currency,
 		itemCurrencyUtils,
 		invoiceStore,
 		eventBus,
@@ -726,7 +723,7 @@ const addMainItemAndSelectedAddons = async (selectedAddons: any[]) => {
 
 	// Add each addon as separate line items
 	for (const addon of selectedAddons) {
-		const addonItem = items.value.find((it: any) => it.item_code === addon.item_code) || {
+		const addonItem: any = items.value.find((it: any) => it.item_code === addon.item_code) || {
 			item_code: addon.item_code,
 			item_name: addon.item_name,
 			price_list_rate: addon.price,
@@ -735,8 +732,21 @@ const addMainItemAndSelectedAddons = async (selectedAddons: any[]) => {
 		};
 		addonItem.price_list_rate = addon.price;
 		addonItem.rate = addon.price;
+		addonItem.addon_parent_item_code = mainItem.item_code;
+		addonItem.addon_parent_item_name = mainItem.item_name || mainItem.item_code;
 
 		await add_item_to_cart_directly(addonItem, 1, { new_line: true });
+	}
+
+	if (selectedAddons.length) {
+		const addonNames = selectedAddons
+			.map((addon) => addon.item_name || addon.item_code)
+			.filter(Boolean)
+			.join(", ");
+		toastStore.show({
+			message: `${__("Added add-ons for")}: ${mainItem.item_name || mainItem.item_code} - ${addonNames}`,
+			color: "info",
+		});
 	}
 
 	selectedItemForAddon.value = null;
@@ -781,11 +791,14 @@ const add_item = async (item, optionsOrQty: any = {}) => {
 		}
 
 		// Intercept items with addons
-		if (item.custom_has_addons && (item.custom_has_addons == 1 || item.custom_has_addons === true || item.custom_has_addons === "1")) {
+		if (
+			item.custom_has_addons &&
+			(item.custom_has_addons == 1 || item.custom_has_addons === true || item.custom_has_addons === "1")
+		) {
 			selectedItemForAddon.value = item;
 			addonContextForAddition.value = {
 				options,
-				requestedQty
+				requestedQty,
 			};
 			addonDialog.value = true;
 			return;
@@ -953,7 +966,8 @@ onMounted(async () => {
 		applyCurrencyConversionToItem: (item) => {
 			itemCurrencyUtils.applyCurrencyConversionToItem(item, {
 				pos_profile: pos_profile.value,
-				price_list_currency: item?.original_currency || item?.price_list_currency || pos_profile.value?.currency,
+				price_list_currency:
+					item?.original_currency || item?.price_list_currency || pos_profile.value?.currency,
 				selected_currency: selected_currency.value || pos_profile.value?.currency,
 				exchange_rate: selected_exchange_rate.value,
 				conversion_rate: selected_conversion_rate.value,
