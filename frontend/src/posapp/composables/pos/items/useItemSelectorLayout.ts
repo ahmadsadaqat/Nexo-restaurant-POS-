@@ -29,9 +29,16 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 	const scrollThrottle = ref<number | null>(null);
 
 	// Computed Metrics
-	const cardColumns = computed(() => getCardColumns(windowWidth.value));
-	const cardGap = computed(() => getCardGap(windowWidth.value));
-	const cardPadding = computed(() => getCardPadding(windowWidth.value));
+	const cardContainerWidth = computed(() => {
+		if (containerActualWidth.value > 0) {
+			return containerActualWidth.value;
+		}
+		return windowWidth.value * 0.4; // Approx 40% of screen for items selector usually
+	});
+
+	const cardColumns = computed(() => getCardColumns(cardContainerWidth.value, windowWidth.value));
+	const cardGap = computed(() => getCardGap(cardContainerWidth.value, windowWidth.value));
+	const cardPadding = computed(() => getCardPadding(cardContainerWidth.value, windowWidth.value));
 
 	const cardRowHeight = computed(() => {
 		if (windowWidth.value <= 768) {
@@ -45,13 +52,6 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 
 	const cardSlotHeight = computed(() => cardRowHeight.value + cardGap.value);
 	const cardSlotWidth = computed(() => cardColumnWidth.value + cardGap.value);
-
-	const cardContainerWidth = computed(() => {
-		if (containerActualWidth.value > 0) {
-			return containerActualWidth.value;
-		}
-		return windowWidth.value * 0.4; // Approx 40% of screen for items selector usually
-	});
 
 	const cardColumnWidth = computed(() => {
 		const columns = Math.max(1, cardColumns.value);
@@ -150,15 +150,25 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 		});
 	};
 
+	let resizeObserver: ResizeObserver | null = null;
+
 	// Lifecycle
 	onMounted(() => {
 		window.addEventListener("resize", scheduleCardMetricsUpdate);
 		nextTick(() => {
 			updateWindowWidth();
-			if (itemsContainerRef.value && itemsContainerRef.value.$el) {
-				containerActualWidth.value = itemsContainerRef.value.$el.clientWidth;
-			} else if (itemsContainerRef.value) {
-				containerActualWidth.value = itemsContainerRef.value.clientWidth || 0;
+			const el = getItemsContainerElement();
+			if (el) {
+				containerActualWidth.value = el.clientWidth;
+				if (typeof ResizeObserver !== 'undefined') {
+					resizeObserver = new ResizeObserver(() => {
+						if (el.clientWidth > 0 && el.clientWidth !== containerActualWidth.value) {
+							containerActualWidth.value = el.clientWidth;
+							checkItemContainerOverflow();
+						}
+					});
+					resizeObserver.observe(el);
+				}
 			}
 			checkItemContainerOverflow();
 		});
@@ -166,6 +176,10 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 
 	onUnmounted(() => {
 		window.removeEventListener("resize", scheduleCardMetricsUpdate);
+		if (resizeObserver) {
+			resizeObserver.disconnect();
+			resizeObserver = null;
+		}
 		if (scrollThrottle.value) {
 			cancelAnimationFrame(scrollThrottle.value);
 		}
