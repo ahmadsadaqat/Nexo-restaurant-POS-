@@ -10,6 +10,7 @@ from frappe.utils import add_days, flt
 from posawesome.posawesome.api.utilities import get_company_domain  # Updated import
 from posawesome.posawesome.api.payments import get_posawesome_credit_redeem_remark
 from posawesome.posawesome.api.tax_contracts import apply_pos_tax_inclusion_contract
+from posawesome.posawesome.api.payment_tax import apply_payment_tax_template
 from posawesome.posawesome.doctype.delivery_charges.delivery_charges import (
     get_applicable_delivery_charges,
 )
@@ -23,6 +24,7 @@ def validate(doc, method):
     set_patient(doc)
     auto_set_delivery_charges(doc)
     calc_delivery_charges(doc)
+    apply_payment_method_taxes(doc)
     apply_tax_inclusive(doc)
 
 
@@ -332,6 +334,12 @@ def calc_delivery_charges(doc):
 
     if calculate_taxes_and_totals:
         doc.calculate_taxes_and_totals()
+
+
+def apply_payment_method_taxes(doc):
+    """Apply tax template based on the dominant payment method."""
+    if doc.is_pos and doc.pos_profile:
+        apply_payment_tax_template(doc)
 
 
 def apply_tax_inclusive(doc):

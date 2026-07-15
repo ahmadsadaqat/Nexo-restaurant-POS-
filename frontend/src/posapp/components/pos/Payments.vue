@@ -309,6 +309,8 @@ import {
 	getStoredCustomer,
 	getCachedGiftCardSnapshot,
 	saveGiftCardSnapshot,
+	getTaxTemplate,
+	getTaxInclusiveSetting,
 } from "../../../offline/index";
 import GiftCardDialog from "./wallet/GiftCardDialog.vue";
 import {
@@ -1809,7 +1811,117 @@ const queueShortcutSubmit = (payload = {}) => {
 	}
 };
 
+const recalculateTaxesForPayments = () => {
+	if (!invoice_doc.value || !pos_profile.value) return;
+
+	const enabled = pos_profile.value.posa_enable_payment_tax_templates;
+	if (!enabled) return;
+
+	const payments = invoice_doc.value.payments || [];
+	let bestMop = null;
+	let bestAmount = 0;
+
+	const mappings = {};
+	if (Array.isArray(pos_profile.value.posa_payment_tax_templates)) {
+		pos_profile.value.posa_payment_tax_templates.forEach((row) => {
+			if (row.mode_of_payment && row.tax_template) {
+				mappings[row.mode_of_payment] = row.tax_template;
+			}
+		});
+	}
+
+	payments.forEach((p) => {
+		const mop = p.mode_of_payment;
+		const amount = Math.abs(flt(p.amount));
+		if (mop && amount > bestAmount && mappings[mop]) {
+			bestAmount = amount;
+			bestMop = mop;
+		}
+	});
+
+	const targetTemplate = bestMop ? mappings[bestMop] : pos_profile.value.taxes_and_charges;
+	if (!targetTemplate) return;
+
+	if (invoice_doc.value.taxes_and_charges === targetTemplate && invoice_doc.value.taxes?.length > 0) {
+		return;
+	}
+
+	const tmpl = getTaxTemplate(targetTemplate);
+	if (!tmpl) return;
+
+	invoice_doc.value.taxes_and_charges = targetTemplate;
+	invoice_doc.value.taxes = [];
+
+	const inclusive = getTaxInclusiveSetting();
+	const context = {
+		pos_profile: pos_profile.value,
+		invoice_doc: invoice_doc.value,
+		selected_currency: invoice_doc.value.currency,
+		conversion_rate: invoice_doc.value.conversion_rate || 1,
+		price_list_currency: invoice_doc.value.price_list_currency,
+		plc_conversion_rate: invoice_doc.value.plc_conversion_rate || 1,
+	};
+
+	let grandTotal = invoice_doc.value.total;
+	let runningTotal = grandTotal;
+	let totalTax = 0;
+
+	if (Array.isArray(tmpl.taxes)) {
+		tmpl.taxes.forEach((row) => {
+			let tax_amount = 0;
+			if (row.charge_type === "Actual") {
+				tax_amount = flt(row.tax_amount || 0);
+			} else if (inclusive) {
+				tax_amount = flt((invoice_doc.value.total * flt(row.rate)) / 100);
+			} else {
+				tax_amount = flt((invoice_doc.value.net_total * flt(row.rate)) / 100);
+			}
+			if (!inclusive) {
+				runningTotal += tax_amount;
+			}
+			totalTax += tax_amount;
+			invoice_doc.value.taxes.push({
+				account_head: row.account_head,
+				charge_type: row.charge_type || "On Net Total",
+				description: row.description,
+				rate: row.rate,
+				included_in_print_rate: row.charge_type === "Actual" ? 0 : inclusive ? 1 : 0,
+				tax_amount: tax_amount,
+				total: runningTotal,
+				base_tax_amount: toCompanyCurrency(context, tax_amount),
+				base_total: toCompanyCurrency(context, runningTotal),
+			});
+		});
+	}
+
+	if (inclusive) {
+		invoice_doc.value.net_total = invoice_doc.value.total - totalTax;
+		invoice_doc.value.base_net_total = toCompanyCurrency(context, invoice_doc.value.net_total);
+		grandTotal = invoice_doc.value.total;
+	} else {
+		grandTotal = runningTotal;
+	}
+
+	invoice_doc.value.total_taxes_and_charges = totalTax;
+
+	if (invoice_doc.value.is_return && grandTotal > 0) {
+		grandTotal = -Math.abs(grandTotal);
+	}
+
+	invoice_doc.value.grand_total = grandTotal;
+	invoice_doc.value.rounded_total = Math.round(grandTotal);
+	invoice_doc.value.base_grand_total = toCompanyCurrency(context, grandTotal);
+	invoice_doc.value.base_rounded_total = toCompanyCurrency(context, invoice_doc.value.rounded_total);
+};
+
 // Watchers
+watch(
+	() => invoice_doc.value?.payments,
+	() => {
+		recalculateTaxesForPayments();
+	},
+	{ deep: true }
+);
 watch(
 	() => uiStore.posProfile,
 	(p) => {

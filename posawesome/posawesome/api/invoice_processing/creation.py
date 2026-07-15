@@ -26,6 +26,7 @@ from posawesome.posawesome.api.invoice_processing.stock import (
     _collect_stock_errors,
 )
 from posawesome.posawesome.api.tax_contracts import apply_pos_tax_inclusion_contract
+from posawesome.posawesome.api.payment_tax import apply_payment_tax_template
 from posawesome.posawesome.api.payment_processing.utils import get_bank_cash_account as get_bank_account
 from posawesome.posawesome.api.utilities import ensure_child_doctype, set_batch_nos_for_bundels
 from posawesome.posawesome.api.payments import redeeming_customer_credit
@@ -836,6 +837,8 @@ def _save_draft_with_latest_timestamp(invoice_doc, retries=2):
 
 def _apply_tax_contract_before_save(invoice_doc):
     _merge_duplicate_taxes(invoice_doc)
+    if getattr(invoice_doc, "is_pos", False) and getattr(invoice_doc, "pos_profile", None):
+        apply_payment_tax_template(invoice_doc)
     apply_pos_tax_inclusion_contract(invoice_doc)
 
 

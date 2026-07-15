@@ -289,7 +289,37 @@ export function get_invoice_doc(context: any) {
 
 	// Prepare taxes array
 	doc.taxes = [];
-	if (context.invoice_doc && context.invoice_doc.taxes) {
+	let hasPaymentTaxes = false;
+	let resolvedTmplName = null;
+
+	if (
+		context.pos_profile?.posa_enable_payment_tax_templates &&
+		Array.isArray(context.pos_profile.posa_payment_tax_templates)
+	) {
+		const paymentsList = get_payments(context) || [];
+		let bestMop = null;
+		let bestAmount = 0;
+		const mappings: Record<string, string> = {};
+		context.pos_profile.posa_payment_tax_templates.forEach((row: any) => {
+			if (row.mode_of_payment && row.tax_template) {
+				mappings[row.mode_of_payment] = row.tax_template;
+			}
+		});
+		paymentsList.forEach((payment: any) => {
+			const mop = payment.mode_of_payment;
+			const amount = Math.abs(flt(payment.amount));
+			if (mop && amount > bestAmount && mappings[mop]) {
+				bestAmount = amount;
+				bestMop = mop;
+			}
+		});
+		resolvedTmplName = bestMop ? mappings[bestMop] : context.pos_profile.taxes_and_charges;
+		if (resolvedTmplName) {
+			hasPaymentTaxes = true;
+		}
+	}
+
+	if (!hasPaymentTaxes && context.invoice_doc && context.invoice_doc.taxes) {
 		let totalTax = 0;
 		context.invoice_doc.taxes.forEach((tax) => {
 			if (tax.tax_amount) {
@@ -310,8 +340,9 @@ export function get_invoice_doc(context: any) {
 			});
 		});
 		doc.total_taxes_and_charges = totalTax;
-	} else if (isOffline()) {
-		const tmpl = getTaxTemplate(context.pos_profile.taxes_and_charges);
+	} else if (hasPaymentTaxes || isOffline()) {
+		const templateName = resolvedTmplName || context.pos_profile.taxes_and_charges;
+		const tmpl = getTaxTemplate(templateName);
 		if (tmpl && Array.isArray(tmpl.taxes)) {
 			const inclusive = getTaxInclusiveSetting();
 			let runningTotal = grandTotal;
@@ -352,6 +383,7 @@ export function get_invoice_doc(context: any) {
 				grandTotal = runningTotal;
 			}
 			doc.total_taxes_and_charges = totalTax;
+			doc.taxes_and_charges = templateName;
 		}
 	}
 

@@ -82,6 +82,14 @@ frappe.ui.form.on("POS Profile", {
 			};
 		});
 
+		set_child_query("tax_template", "posa_payment_tax_templates", function (doc) {
+			return {
+				filters: {
+					company: doc.company,
+				},
+			};
+		});
+
 		frappe.call({
 			method: "posawesome.posawesome.api.utilities.get_language_options",
 			callback: function (r) {

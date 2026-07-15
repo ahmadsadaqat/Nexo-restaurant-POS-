@@ -303,6 +303,8 @@ fixtures = [
                     "Sales Order-posa_coupons",
                     "Sales Order Item-posa_row_id",
                     "POS Profile-posa_tax_inclusive",
+                    "POS Profile-posa_enable_payment_tax_templates",
+                    "POS Profile-posa_payment_tax_templates",
                     "POS Profile-posa_use_percentage_discount",
                     "POS Profile-posa_allow_customer_purchase_order",
                     "POS Profile-posa_allow_purchase_order",

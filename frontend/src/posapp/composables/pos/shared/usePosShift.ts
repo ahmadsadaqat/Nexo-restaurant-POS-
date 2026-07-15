@@ -146,6 +146,33 @@ export function usePosShift(openDialog?: () => void) {
 							},
 						});
 					}
+					// Load payment-method-specific tax templates
+					if (
+						pos_profile.value.posa_enable_payment_tax_templates &&
+						Array.isArray(pos_profile.value.posa_payment_tax_templates)
+					) {
+						const loadedTemplates = new Set<string>();
+						if (pos_profile.value.taxes_and_charges) {
+							loadedTemplates.add(pos_profile.value.taxes_and_charges);
+						}
+						for (const row of pos_profile.value.posa_payment_tax_templates) {
+							if (row.tax_template && !loadedTemplates.has(row.tax_template)) {
+								loadedTemplates.add(row.tax_template);
+								frappe.call({
+									method: "frappe.client.get",
+									args: {
+										doctype: "Sales Taxes and Charges Template",
+										name: row.tax_template,
+									},
+									callback: (res: any) => {
+										if (res.message) {
+											setTaxTemplate(row.tax_template, res.message);
+										}
+									},
+								});
+							}
+						}
+					}
 					console.info("LoadPosProfile");
 					try {
 						setOpeningStorage(r.message);
