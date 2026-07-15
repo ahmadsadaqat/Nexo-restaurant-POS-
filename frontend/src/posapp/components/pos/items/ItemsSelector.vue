@@ -710,6 +710,18 @@ const add_item_to_cart_directly = async (item: any, requestedQty: number, option
 	}
 };
 
+const moveCartItemAfter = (rowId: string, afterRowId: string | null | undefined) => {
+	const order = invoiceStore?.itemOrder as any;
+	if (!rowId || !afterRowId || !Array.isArray(order)) return;
+	const currentIndex = order.indexOf(rowId);
+	const afterIndex = order.indexOf(afterRowId);
+	if (currentIndex === -1 || afterIndex === -1 || currentIndex === afterIndex) return;
+	order.splice(currentIndex, 1);
+	const adjustedAfterIndex = currentIndex < afterIndex ? afterIndex - 1 : afterIndex;
+	order.splice(adjustedAfterIndex + 1, 0, rowId);
+	invoiceStore.touch?.();
+};
+
 const addMainItemAndSelectedAddons = async (selectedAddons: any[]) => {
 	addonDialog.value = false;
 	const mainItem = selectedItemForAddon.value;
@@ -719,7 +731,8 @@ const addMainItemAndSelectedAddons = async (selectedAddons: any[]) => {
 	const { options, requestedQty } = contextAddition;
 
 	// Add main item
-	await add_item_to_cart_directly(mainItem, requestedQty, options);
+	const mainAddedLine: any = await add_item_to_cart_directly(mainItem, requestedQty, options);
+	let previousLine = mainAddedLine;
 
 	// Add each addon as separate line items
 	for (const addon of selectedAddons) {
@@ -735,7 +748,14 @@ const addMainItemAndSelectedAddons = async (selectedAddons: any[]) => {
 		addonItem.addon_parent_item_code = mainItem.item_code;
 		addonItem.addon_parent_item_name = mainItem.item_name || mainItem.item_code;
 
-		await add_item_to_cart_directly(addonItem, 1, { new_line: true });
+		const addedAddonLine: any = await add_item_to_cart_directly(addonItem, 1, { new_line: true });
+		if (addedAddonLine?.posa_row_id) {
+			moveCartItemAfter(
+				addedAddonLine.posa_row_id,
+				previousLine?.posa_row_id || mainAddedLine?.posa_row_id,
+			);
+			previousLine = addedAddonLine;
+		}
 	}
 
 	if (selectedAddons.length) {
