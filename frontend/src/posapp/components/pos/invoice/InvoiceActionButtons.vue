@@ -42,20 +42,7 @@
 				{{ __("Select S.O") }}
 			</v-btn>
 		</v-col>
-		<v-col cols="12" sm="6">
-			<v-btn
-				block
-				color="deep-purple"
-				theme="dark"
-				prepend-icon="mdi-folder-search-outline"
-				@click="$emit('open-invoice-management')"
-				class="summary-btn"
-				data-pos-keyboard-target="invoice-action"
-				:loading="invoiceManagementLoading"
-			>
-				{{ __("Invoice Mgmt") }}
-			</v-btn>
-		</v-col>
+
 		<v-col cols="12" sm="6">
 			<v-btn
 				block

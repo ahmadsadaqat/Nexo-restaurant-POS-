@@ -309,6 +309,7 @@ const FALLBACK_LANGUAGES = [
 import { useLastInvoicePrinting } from "../../composables/core/useLastInvoicePrinting";
 import { useUpdateStore } from "../../stores/updateStore";
 import { useEmployeeStore } from "../../stores/employeeStore";
+import { useUIStore } from "../../stores/uiStore";
 import { storeToRefs } from "pinia";
 import QzTrayDialog from "./QzTrayDialog.vue";
 
@@ -328,8 +329,9 @@ export default {
 		const { printLastInvoice } = useLastInvoicePrinting();
 		const updateStore = useUpdateStore();
 		const employeeStore = useEmployeeStore();
+		const uiStore = useUIStore();
 		const { currentCashier, currentCashierDisplay } = storeToRefs(employeeStore);
-		return { printLastInvoice, updateStore, employeeStore, currentCashier, currentCashierDisplay };
+		return { printLastInvoice, updateStore, employeeStore, uiStore, currentCashier, currentCashierDisplay };
 	},
 	data() {
 		return {
@@ -447,6 +449,14 @@ export default {
 					icon: this.manualOffline ? "mdi-lan-connect" : "mdi-lan-disconnect",
 					tone: this.manualOffline ? "success" : "warning",
 					handler: "toggleOfflineAction",
+				},
+				{
+					id: "invoice-management",
+					label: __("Invoice Mgmt"),
+					subtitle: __("Manage past and draft invoices"),
+					icon: "mdi-folder-search-outline",
+					tone: "info",
+					handler: "openInvoiceManagement",
 				},
 				!this.posProfile?.posa_hide_closing_shift
 					? {
@@ -664,6 +674,10 @@ export default {
 				case "toggleOfflineAction":
 					this.closeMenu();
 					this.$emit("toggle-offline");
+					break;
+				case "openInvoiceManagement":
+					this.closeMenu();
+					this.uiStore.openInvoiceManagement("history", "invoice");
 					break;
 				case "openLanguageDialog":
 					this.closeMenu();
