@@ -96,19 +96,13 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 			return;
 		}
 
-		const shell = el.closest(".items-selector-shell") as HTMLElement | null;
-		let containerHeight = window.innerHeight * 0.85; // Fallback
+		// Calculate height strictly relative to the viewport.
+		// Viewport height - Navbar (64px)
+		let containerHeight = window.innerHeight - 64;
 
-		if (shell) {
-			containerHeight = shell.clientHeight;
-		} else {
-			const rawVal = getComputedStyle(el).getPropertyValue("--container-height");
-			if (rawVal.includes("vh")) {
-				containerHeight = (parseFloat(rawVal) / 100) * window.innerHeight;
-			} else {
-				containerHeight = parseFloat(rawVal);
-			}
-		}
+		// Deduct Pos.vue dynamic-container and dynamic-col padding/margins
+		// (.dynamic-col has ~12px padding + 12px margin-top, etc.)
+		containerHeight -= 40; 
 
 		if (isNaN(containerHeight) || containerHeight <= 0) {
 			isOverflowing.value = false;
@@ -119,8 +113,9 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 			.closest(".dynamic-padding")
 			?.querySelector(".sticky-header") as HTMLElement | null;
 		const headerHeight = stickyHeader ? stickyHeader.offsetHeight : 0;
-		// Leave a small buffer for paddings/margins
-		const availableHeight = containerHeight - headerHeight - 30;
+		
+		// Leave a small buffer for paddings/margins inside the card itself
+		const availableHeight = containerHeight - headerHeight - 20;
 
 		// Only apply if calculated height is valid
 		if (availableHeight > 0) {
