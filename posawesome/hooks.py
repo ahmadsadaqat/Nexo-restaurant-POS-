@@ -352,6 +352,8 @@ fixtures = [
                     "POS Profile-posa_enable_print_audit",
                     "POS Profile-posa_default_printer_profile",
                     "POS Profile-posa_qz_printer_name",
+                    "POS Profile-posa_enable_kot_printing",
+                    "POS Profile-posa_kot_printer_profile",
                     "POS Profile-posa_enable_camera_scanning",
                     "POS Profile-posa_camera_scan_type",
                     "POS Profile-posa_language",

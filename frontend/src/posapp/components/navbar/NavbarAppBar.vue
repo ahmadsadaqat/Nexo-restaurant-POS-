@@ -67,6 +67,16 @@
 						<slot name="notification-bell"></slot>
 					</div>
 
+					<v-btn
+						class="offline-invoices-btn"
+						variant="text"
+						icon
+						:title="__('Hold Invoices')"
+						@click="$emit('open-draft-invoices')"
+					>
+						<v-icon class="pos-text-primary">mdi-pause-circle-outline</v-icon>
+					</v-btn>
+
 					<!-- Mobile Menu - contains all other items -->
 					<div class="menu-wrapper">
 						<slot name="menu"></slot>
@@ -123,6 +133,16 @@
 					<div class="notification-wrapper">
 						<slot name="notification-bell"></slot>
 					</div>
+
+					<v-btn
+						class="offline-invoices-btn"
+						variant="text"
+						icon
+						:title="__('Hold Invoices')"
+						@click="$emit('open-draft-invoices')"
+					>
+						<v-icon class="pos-text-primary">mdi-pause-circle-outline</v-icon>
+					</v-btn>
 
 					<!-- Menu component slot -->
 					<div class="menu-wrapper">
@@ -304,7 +324,7 @@ export default {
 			}
 		},
 	},
-	emits: ["nav-click", "go-desk", "show-offline-invoices", "open-employee-switch"],
+	emits: ["nav-click", "go-desk", "show-offline-invoices", "open-employee-switch", "open-draft-invoices"],
 };
 </script>
 

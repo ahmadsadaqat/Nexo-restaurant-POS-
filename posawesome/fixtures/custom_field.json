@@ -10201,5 +10201,29 @@
   "translatable": 0,
   "unique": 0,
   "width": null
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Custom Field",
+  "dt": "POS Profile",
+  "fieldname": "posa_enable_kot_printing",
+  "fieldtype": "Check",
+  "insert_after": "posa_enable_print_audit",
+  "label": "Enable KOT Printing",
+  "module": "POSAwesome",
+  "name": "POS Profile-posa_enable_kot_printing"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Custom Field",
+  "dt": "POS Profile",
+  "fieldname": "posa_kot_printer_profile",
+  "fieldtype": "Link",
+  "options": "POSA Printer Profile",
+  "insert_after": "posa_enable_kot_printing",
+  "label": "KOT Printer Profile",
+  "depends_on": "eval:doc.posa_enable_kot_printing",
+  "module": "POSAwesome",
+  "name": "POS Profile-posa_kot_printer_profile"
  }
 ]

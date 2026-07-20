@@ -13,6 +13,7 @@
 			@go-desk="goDesk"
 			@show-offline-invoices="showOfflineInvoices = true"
 			@open-employee-switch="openEmployeeSwitch"
+			@open-draft-invoices="uiStore.openInvoiceManagement('drafts')"
 		>
 			<template #notification-bell>
 				<NotificationBell

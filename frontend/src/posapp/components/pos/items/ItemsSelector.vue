@@ -138,6 +138,7 @@
 								@dragstart="onDragStart"
 								@dragend="onDragEnd"
 								@virtual-range-update="onVirtualRangeUpdate"
+								@scroll="onListScroll"
 								@clear-search="clearSearch"
 							/>
 							<ItemsSelectorTable
@@ -1035,6 +1036,13 @@ onMounted(async () => {
 		get loading() {
 			return loading.value;
 		},
+		get hasMoreCachedItems() {
+			return itemsIntegration.hasMoreCachedItems.value;
+		},
+		get totalItemCount() {
+			return itemsIntegration.totalItemCount.value;
+		},
+		appendCachedItemsPage: itemsIntegration.appendCachedItemsPage,
 	});
 
 	itemSelection.registerContext({

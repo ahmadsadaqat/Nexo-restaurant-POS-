@@ -12,6 +12,7 @@ import {
 	shouldUseConfiguredQzDocumentPrinting,
 	shouldUseRawDocumentPrinting,
 } from "../../../services/documentPrint";
+import { printKotDocumentViaQz } from "../../../services/rawDocumentPrint";
 import { isOffline } from "../../../../offline/index";
 import { resolvePaymentPrintDoctype } from "../../../utils/paymentPrintDoctype";
 
@@ -102,6 +103,17 @@ export function usePaymentPrinting(options: PaymentPrintingOptions) {
 
 		if (!docname && !offline) {
 			throw new Error("Cannot print document without a submitted document name");
+		}
+
+		if (profile?.posa_enable_kot_printing) {
+			printKotDocumentViaQz({
+				doctype,
+				name: docname,
+				doc,
+				profile,
+			}).catch((err) => {
+				console.error("KOT Print Error:", err);
+			});
 		}
 
 		// Keep printview auto-trigger disabled; watchPrintWindow/silentPrint owns

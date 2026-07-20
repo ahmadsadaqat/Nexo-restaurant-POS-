@@ -3,6 +3,7 @@ import { get_invoice_doc, get_invoice_items, get_payments } from "./document";
 import { _logPriceListDebug, _buildPriceListSnapshot } from "./currency";
 import { applyReturnDiscountProration } from "./item_updates";
 import { prepareDocumentFlowAction } from "../../../utils/documentSources";
+import { printKotDocumentViaQz } from "../../../services/rawDocumentPrint";
 
 declare const __: (_text: string, _args?: any[]) => string;
 declare const frappe: any;
@@ -187,7 +188,7 @@ export async function cancel_invoice(context: any) {
 
 export async function save_and_clear_invoice(context: any) {
 	const { clearInvoice } = getItemAdditionApi();
-	let old_invoice = null;
+	let old_invoice: any = null;
 	const doc = get_invoice_doc(context);
 
 	try {
@@ -211,6 +212,17 @@ export async function save_and_clear_invoice(context: any) {
 			color: "error",
 		});
 	} else {
+		if (context.pos_profile?.posa_enable_kot_printing) {
+			printKotDocumentViaQz({
+				doctype: old_invoice.doctype || context.invoiceType || "POS Invoice",
+				name: old_invoice.name || "Draft",
+				doc: old_invoice,
+				profile: context.pos_profile,
+			}).catch((err) => {
+				console.error("KOT Print Error:", err);
+			});
+		}
+
 		clearInvoice(context);
 		if (context.eventBus) {
 			context.eventBus.emit("focus_item_search");

@@ -344,3 +344,103 @@ export async function printRawDocumentViaQz(options: RawDocumentPrintOptions) {
 	);
 	await sendRawToQz(rawData, options.printerName || options.profile?.posa_qz_printer_name);
 }
+
+export function buildKotEscPosDocument(doc: Record<string, any>, options: RawDocumentPrintOptions) {
+	const width = resolveWidth(options.profile, options.widthChars);
+	const lines: string[] = [];
+
+	lines.push(center(translate("KITCHEN ORDER TICKET"), width));
+	lines.push(line(width, "="));
+	
+	if (doc.posa_table_no) {
+		lines.push(leftRight(translate("Table No"), doc.posa_table_no, width));
+	}
+	if (doc.posa_order_type) {
+		lines.push(leftRight(translate("Order Type"), doc.posa_order_type, width));
+	}
+	lines.push(leftRight(translate("Order No"), options.name || doc.name, width));
+	
+	const date = [docDate(doc), docTime(doc)].filter(Boolean).join(" ");
+	if (date) lines.push(leftRight(translate("Date"), date, width));
+	
+	lines.push(line(width));
+	lines.push(leftRight(translate("Item"), translate("Qty"), width));
+	lines.push(line(width));
+
+	const items = Array.isArray(doc.items) ? doc.items : [];
+	for (const item of items) {
+		const name = item.item_name || item.item_code || item.description || translate("Item");
+		const qty = toNumber(item.qty).toFixed(3).replace(/\.?0+$/, "");
+		const uom = item.uom || item.stock_uom || "";
+		const qtyDisplay = `${qty} ${cleanText(uom)}`.trim();
+		
+		const nameLines = wrap(name, width - qtyDisplay.length - 1);
+		if (nameLines.length > 0) {
+			lines.push(leftRight(nameLines[0], qtyDisplay, width));
+			for (let i = 1; i < nameLines.length; i++) {
+				lines.push(nameLines[i] as string);
+			}
+		} else {
+			lines.push(leftRight("", qtyDisplay, width));
+		}
+		
+		if (item.posa_notes) {
+			for (const noteLine of wrap(`* ${item.posa_notes}`, width - 2)) {
+				lines.push(`  ${noteLine}`);
+			}
+		}
+	}
+	
+	lines.push(line(width));
+	if (doc.posa_notes) {
+		for (const row of wrap(translate("Order Notes:"), width)) {
+			lines.push(row);
+		}
+		for (const row of wrap(doc.posa_notes, width)) {
+			lines.push(row);
+		}
+		lines.push(line(width));
+	}
+
+	return [
+		`${ESC}@`,
+		`${ESC}a\x01`,
+		`${ESC}E\x01`,
+		`${lines.shift() || ""}\n`,
+		`${ESC}E\x00`,
+		`${ESC}a\x00`,
+		`${lines.join("\n")}\n\n\n`,
+		`${GS}V\x00`,
+	].join("");
+}
+
+export async function printKotDocumentViaQz(options: RawDocumentPrintOptions) {
+	if (!options?.doctype || !options?.name) {
+		throw new Error(translate("Invalid raw print document details."));
+	}
+
+	if (!parseBooleanSetting(options.profile?.posa_enable_kot_printing)) {
+		return;
+	}
+
+	const doc = await loadDocument(options);
+	if (!doc) {
+		throw new Error(translate("Unable to load document for KOT printing."));
+	}
+	
+	const kotPrinterProfileName = options.profile?.posa_kot_printer_profile;
+	if (!kotPrinterProfileName) {
+		console.warn(translate("KOT Printer Profile is not configured in POS Profile."));
+		return;
+	}
+	
+	const rawData = buildKotEscPosDocument(
+		{
+			...doc,
+			doctype: doc.doctype || options.doctype,
+			name: doc.name || options.name,
+		},
+		options,
+	);
+	await sendRawToQz(rawData, kotPrinterProfileName);
+}

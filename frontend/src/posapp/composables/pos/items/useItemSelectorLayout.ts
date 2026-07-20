@@ -119,7 +119,7 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 
 		// Only apply if calculated height is valid
 		if (availableHeight > 0) {
-			el.style.maxHeight = `${availableHeight}px`;
+			el.style.height = `${availableHeight}px`;
 			isOverflowing.value = el.scrollHeight > availableHeight;
 		}
 	};

@@ -38,6 +38,7 @@
 			:buffer="virtualScrollBuffer"
 			:emit-update="true"
 			@update="handleRangeUpdate"
+			@scroll.passive="handleScroll"
 		>
 			<template #default="{ item }">
 				<ItemCard
@@ -109,7 +110,7 @@ const props = defineProps({
 	clearSearchLabel: { type: String, default: "" },
 });
 
-const emit = defineEmits(["select-item", "dragstart", "dragend", "virtual-range-update", "clear-search"]);
+const emit = defineEmits(["select-item", "dragstart", "dragend", "virtual-range-update", "clear-search", "scroll"]);
 
 const showClearButton = computed(() => {
 	return Boolean(props.searchInput) || (props.itemGroup && props.itemGroup !== "ALL");
@@ -135,6 +136,10 @@ const handleClearSearch = () => {
 	emit("clear-search");
 };
 
+const handleScroll = (event) => {
+	emit("scroll", event);
+};
+
 const scrollerRef = ref(null);
 
 const scrollToItem = (index) => {
@@ -155,6 +160,10 @@ defineExpose({ scrollToItem, getScrollerElement, scrollerRef });
 	scrollbar-gutter: stable;
 }
 
+.items-card-container {
+	height: 100%;
+}
+
 .items-card-grid {
 	display: grid;
 	grid-template-columns: repeat(4, 1fr);
@@ -170,7 +179,7 @@ defineExpose({ scrollToItem, getScrollerElement, scrollerRef });
 }
 
 .virtual-scroller {
-	height: calc(100% - 80px);
+	height: 100%;
 	overflow-y: auto;
 	position: relative;
 }
