@@ -1007,11 +1007,24 @@ export default {
 
 			this.toastStore.show({ message: this.__("Creating KOT..."), color: "info" });
 			try {
-				const itemsToPrint = this.items.map((i) => ({
-					item_code: i.item_code,
-					item_name: i.item_name,
-					qty: i.qty,
-				}));
+				const itemsToPrint = [];
+				this.items.forEach((i) => {
+					// Skip addons themselves; they are bundled with their parent
+					if (i.addon_parent_item_code) return;
+					
+					const itemAddons = this.items.filter(a => a.addon_parent_item_code === i.item_code);
+					const addonNames = itemAddons.map(a => a.item_name || a.item_code).join(", ");
+					const addonCodes = itemAddons.map(a => a.item_code);
+					
+					itemsToPrint.push({
+						item_code: i.item_code,
+						item_name: i.item_name,
+						qty: i.qty,
+						has_addons: itemAddons.length > 0 ? 1 : 0,
+						addon: addonNames,
+						addon_codes: addonCodes
+					});
+				});
 				const payload = {
 					items: itemsToPrint,
 					table_no: this.invoiceStore.tableNo,

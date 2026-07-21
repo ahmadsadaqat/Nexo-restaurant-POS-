@@ -10222,7 +10222,7 @@
   "options": "POSA Printer Profile",
   "insert_after": "posa_enable_kot_printing",
   "label": "KOT Printer Profile",
-  "depends_on": "eval:doc.posa_enable_kot_printing",
+  "depends_on": "eval:doc.posa_enable_kot_printing==1",
   "module": "POSAwesome",
   "name": "POS Profile-posa_kot_printer_profile"
  }
