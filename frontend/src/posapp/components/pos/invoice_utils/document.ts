@@ -453,6 +453,11 @@ export function get_invoice_doc(context: any) {
 	doc.posa_order_type = context.invoiceStore?.orderType || "Dine In";
 	doc.posa_table_no = context.invoiceStore?.tableNo || null;
 	doc.custom_rider = context.invoiceStore?.customRider || null;
+	doc.custom_branch =
+		sourceDoc.custom_branch ||
+		context.pos_profile?.custom_branch ||
+		context.pos_profile?.branch ||
+		null;
 	doc.posa_authorization_code = sourceDoc.posa_authorization_code ?? null;
 	doc.posa_return_valid_upto = sourceDoc.posa_return_valid_upto ?? null;
 	doc.posting_date = normalizeBackendDate(

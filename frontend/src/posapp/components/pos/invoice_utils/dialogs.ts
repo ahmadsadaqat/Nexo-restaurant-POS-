@@ -45,13 +45,6 @@ export async function show_payment(context: any) {
 			return;
 		}
 
-		if (context.invoiceStore?.orderType === "Delivery" && !context.invoiceStore?.customRider) {
-			context.toastStore.show({
-				title: __(`Please select a Rider for Delivery order`),
-				color: "error",
-			});
-			return;
-		}
 
 		const isValid = context.validate ? await context.validate() : true;
 

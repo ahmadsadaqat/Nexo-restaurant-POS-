@@ -1285,6 +1285,16 @@ def submit_invoice(invoice, data, submit_in_background=False):
 
     _apply_loyalty_redemption_settings(invoice_doc, pos_profile)
 
+    if not invoice_doc.get("custom_branch") and invoice_doc.get("pos_profile"):
+        branch_val = None
+        meta = frappe.get_meta("POS Profile")
+        if meta.has_field("custom_branch"):
+            branch_val = frappe.db.get_value("POS Profile", invoice_doc.pos_profile, "custom_branch")
+        elif meta.has_field("branch"):
+            branch_val = frappe.db.get_value("POS Profile", invoice_doc.pos_profile, "branch")
+        if branch_val:
+            invoice_doc.custom_branch = branch_val
+
     # Ensure item name overrides are respected on submit
     _apply_item_name_overrides(invoice_doc)
     _apply_tax_contract_before_save(invoice_doc)

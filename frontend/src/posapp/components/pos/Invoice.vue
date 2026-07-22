@@ -980,13 +980,6 @@ export default {
 				});
 				return;
 			}
-			if (this.invoiceStore.orderType === "Delivery" && !this.invoiceStore.customRider) {
-				this.toastStore.show({
-					message: this.__("Please assign a rider for Delivery orders"),
-					color: "error",
-				});
-				return;
-			}
 
 			// Save the invoice as an unpaid invoice (Draft)
 			let saved_invoice_name = "";
