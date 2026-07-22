@@ -758,7 +758,12 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		},
 		setOrderType: (val: string) => { 
 			orderType.value = val; 
-			mergeInvoiceDoc({ posa_order_type: val });
+			if (val !== "Dine In") {
+				tableNo.value = "";
+				mergeInvoiceDoc({ posa_order_type: val, posa_table_no: "" });
+			} else {
+				mergeInvoiceDoc({ posa_order_type: val });
+			}
 		},
 		setCustomRider: (val: string) => { 
 			customRider.value = val; 
