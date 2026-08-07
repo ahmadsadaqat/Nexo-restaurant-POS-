@@ -1,5 +1,56 @@
 <template>
 	<v-row justify="center">
+		<!-- Rider Assignment Dialog -->
+		<v-dialog v-model="riderDialog" max-width="480" :theme="isDarkTheme ? 'dark' : 'light'">
+			<v-card class="pos-themed-card" variant="flat">
+				<v-card-title class="d-flex align-center ga-2 pa-4">
+					<v-icon color="warning">mdi-moped-outline</v-icon>
+					<span>{{ riderDialogInvoice?.custom_rider ? __("Update Rider") : __("Assign Rider") }}</span>
+					<span class="text-caption text-medium-emphasis ms-1">{{ riderDialogInvoice?.name }}</span>
+				</v-card-title>
+				<v-divider />
+				<v-card-text class="pa-4">
+					<div class="text-body-2 text-medium-emphasis mb-3">
+						{{ __("Customer") }}: <strong>{{ riderDialogInvoice?.customer_name || riderDialogInvoice?.customer }}</strong>
+					</div>
+					<v-autocomplete
+						v-model="selectedRider"
+						:items="riderOptions"
+						item-title="name"
+						item-value="name"
+						:label="__('Rider (Rider Profile)')"
+						variant="outlined"
+						density="compact"
+						clearable
+						prepend-inner-icon="mdi-account-circle-outline"
+						class="mb-3"
+					/>
+					<v-select
+						v-model="selectedDeliveryStatus"
+						:items="deliveryStatusOptions"
+						:label="__('Delivery Status')"
+						variant="outlined"
+						density="compact"
+						prepend-inner-icon="mdi-map-marker-path"
+					/>
+				</v-card-text>
+				<v-divider />
+				<v-card-actions class="pa-4 ga-2">
+					<v-spacer />
+					<v-btn variant="text" @click="riderDialog = false">{{ __("Cancel") }}</v-btn>
+					<v-btn
+						color="primary"
+						variant="flat"
+						:loading="riderSaving"
+						prepend-icon="mdi-check"
+						@click="saveRiderAssignment"
+					>
+						{{ __("Save") }}
+					</v-btn>
+				</v-card-actions>
+			</v-card>
+		</v-dialog>
+
 		<v-dialog
 			v-model="invoiceManagementDialog"
 			:max-width="invoiceManagementDialogMaxWidth"
@@ -256,6 +307,22 @@
 								<template #item.posting_date="{ item }">{{
 									formatDateTime(item.posting_date, item.posting_time)
 								}}</template>
+								<template #item.posa_order_type="{ item }">
+									<div class="d-flex align-center ga-1 flex-wrap">
+										<v-chip
+											v-if="item.posa_order_type"
+											size="small"
+											:color="orderTypeColor(item.posa_order_type)"
+											variant="tonal"
+										>
+											<v-icon start size="12">{{ orderTypeIcon(item.posa_order_type) }}</v-icon>
+											{{ __(item.posa_order_type) }}
+										</v-chip>
+										<span v-if="item.custom_rider" class="text-caption text-medium-emphasis ms-1">
+											({{ item.custom_rider }}{{ item.custom_delivery_status ? ` · ${__(item.custom_delivery_status)}` : '' }})
+										</span>
+									</div>
+								</template>
 								<template #item.grand_total="{ item }"
 									>{{ currencySymbol(item.currency) }}
 									{{ formatCurrency(item.grand_total) }}</template
@@ -292,6 +359,16 @@
 								</template>
 								<template #item.actions="{ item }">
 									<div class="d-flex justify-end ga-1">
+										<v-btn
+											v-if="isDeliveryInvoice(item)"
+											icon="mdi-moped-outline"
+											variant="text"
+											size="small"
+											:color="item.custom_rider ? 'success' : 'warning'"
+											:title="item.custom_rider ? __('Update Rider') : __('Assign Rider')"
+											:aria-label="__('Assign rider to invoice')"
+											@click="openRiderDialog(item)"
+										/>
 										<v-btn
 											icon="mdi-eye-outline"
 											variant="text"
@@ -355,24 +432,30 @@
 													{{ __(invoice.status || "Draft") }}
 												</v-chip>
 												<v-chip
+													v-if="invoice.posa_order_type"
+													size="small"
+													:color="orderTypeColor(invoice.posa_order_type)"
+													variant="tonal"
+												>
+													<v-icon start size="12">{{ orderTypeIcon(invoice.posa_order_type) }}</v-icon>
+													{{ __(invoice.posa_order_type) }}
+												</v-chip>
+												<v-chip
 													v-if="changeAllocationRepairState(invoice)"
 													size="small"
-													:color="
-														repairStateColor(changeAllocationRepairState(invoice))
-													"
+													:color="repairStateColor(changeAllocationRepairState(invoice))"
 													variant="flat"
 												>
-													{{
-														repairStateLabel(changeAllocationRepairState(invoice))
-													}}
+													{{ repairStateLabel(changeAllocationRepairState(invoice)) }}
 												</v-chip>
 											</div>
 											<div class="invoice-record-card__subtitle">
-												{{
-													invoice.customer_name ||
-													invoice.customer ||
-													__("Walk-in Customer")
-												}}
+												{{ invoice.customer_name || invoice.customer || __("Walk-in Customer") }}
+												<span v-if="invoice.custom_rider" class="meta-rider-tag">
+													<v-icon size="12">mdi-moped-outline</v-icon>
+													{{ invoice.custom_rider }}
+													<span v-if="invoice.custom_delivery_status" class="meta-rider-status">· {{ __(invoice.custom_delivery_status) }}</span>
+												</span>
 											</div>
 										</div>
 										<div class="invoice-record-card__amount-block">
@@ -436,6 +519,16 @@
 									</div>
 
 									<div class="invoice-record-card__actions">
+										<v-btn
+											icon="mdi-moped-outline"
+											size="small"
+											variant="text"
+											v-if="isDeliveryInvoice(invoice)"
+											:color="invoice.custom_rider ? 'success' : 'warning'"
+											:title="invoice.custom_rider ? __('Update Rider') : __('Assign Rider')"
+											:aria-label="__('Assign rider to invoice')"
+											@click="openRiderDialog(invoice)"
+										/>
 										<v-btn
 											icon="mdi-eye-outline"
 											size="small"
@@ -641,6 +734,22 @@
 								<template #item.posting_date="{ item }">{{
 									formatDateTime(item.posting_date, item.posting_time)
 								}}</template>
+								<template #item.posa_order_type="{ item }">
+									<div class="d-flex align-center ga-1 flex-wrap">
+										<v-chip
+											v-if="item.posa_order_type"
+											size="small"
+											:color="orderTypeColor(item.posa_order_type)"
+											variant="tonal"
+										>
+											<v-icon start size="12">{{ orderTypeIcon(item.posa_order_type) }}</v-icon>
+											{{ __(item.posa_order_type) }}
+										</v-chip>
+										<span v-if="item.custom_rider" class="text-caption text-medium-emphasis ms-1">
+											({{ item.custom_rider }}{{ item.custom_delivery_status ? ` · ${__(item.custom_delivery_status)}` : '' }})
+										</span>
+									</div>
+								</template>
 								<template #item.due_date="{ item }">{{
 									formatDateForDisplay(item.due_date) || "-"
 								}}</template>
@@ -663,6 +772,16 @@
 								>
 								<template #item.actions="{ item }">
 									<div class="d-flex justify-end ga-1">
+										<v-btn
+											v-if="isDeliveryInvoice(item)"
+											icon="mdi-moped-outline"
+											variant="text"
+											size="small"
+											:color="item.custom_rider ? 'success' : 'warning'"
+											:title="item.custom_rider ? __('Update Rider') : __('Assign Rider')"
+											:aria-label="__('Assign rider to invoice')"
+											@click="openRiderDialog(item)"
+										/>
 										<v-btn
 											icon="mdi-cash-plus"
 											variant="text"
@@ -726,6 +845,15 @@
 												>
 													{{ __(invoice.status || "Unpaid") }}
 												</v-chip>
+												<v-chip
+													v-if="invoice.posa_order_type"
+													size="small"
+													:color="orderTypeColor(invoice.posa_order_type)"
+													variant="tonal"
+												>
+													<v-icon start size="12">{{ orderTypeIcon(invoice.posa_order_type) }}</v-icon>
+													{{ __(invoice.posa_order_type) }}
+												</v-chip>
 											</div>
 											<div class="invoice-record-card__subtitle">
 												{{
@@ -733,6 +861,11 @@
 													invoice.customer ||
 													__("Walk-in Customer")
 												}}
+												<span v-if="invoice.custom_rider" class="meta-rider-tag">
+													<v-icon size="12">mdi-moped-outline</v-icon>
+													{{ invoice.custom_rider }}
+													<span v-if="invoice.custom_delivery_status" class="meta-rider-status">· {{ __(invoice.custom_delivery_status) }}</span>
+												</span>
 											</div>
 										</div>
 										<div class="d-flex flex-column align-end ga-2">
@@ -802,6 +935,16 @@
 									</div>
 
 									<div class="invoice-record-card__actions">
+										<v-btn
+											icon="mdi-moped-outline"
+											size="small"
+											variant="text"
+											v-if="isDeliveryInvoice(invoice)"
+											:color="invoice.custom_rider ? 'success' : 'warning'"
+											:title="invoice.custom_rider ? __('Update Rider') : __('Assign Rider')"
+											:aria-label="__('Assign rider to invoice')"
+											@click="openRiderDialog(invoice)"
+										/>
 										<v-btn
 											prepend-icon="mdi-cash-plus"
 											size="small"
@@ -930,12 +1073,38 @@
 								<template #item.posting_date="{ item }">{{
 									formatDateTime(item.posting_date, item.posting_time)
 								}}</template>
+								<template #item.posa_order_type="{ item }">
+									<div class="d-flex align-center ga-1 flex-wrap">
+										<v-chip
+											v-if="item.posa_order_type"
+											size="small"
+											:color="orderTypeColor(item.posa_order_type)"
+											variant="tonal"
+										>
+											<v-icon start size="12">{{ orderTypeIcon(item.posa_order_type) }}</v-icon>
+											{{ __(item.posa_order_type) }}
+										</v-chip>
+										<span v-if="item.custom_rider" class="text-caption text-medium-emphasis ms-1">
+											({{ item.custom_rider }}{{ item.custom_delivery_status ? ` · ${__(item.custom_delivery_status)}` : '' }})
+										</span>
+									</div>
+								</template>
 								<template #item.grand_total="{ item }"
 									>{{ currencySymbol(item.currency) }}
 									{{ formatCurrency(item.grand_total) }}</template
 								>
 								<template #item.actions="{ item }">
 									<div class="d-flex justify-end ga-1">
+										<v-btn
+											v-if="isDeliveryInvoice(item)"
+											icon="mdi-moped-outline"
+											variant="text"
+											size="small"
+											:color="item.custom_rider ? 'success' : 'warning'"
+											:title="item.custom_rider ? __('Update Rider') : __('Assign Rider')"
+											:aria-label="__('Assign rider to invoice')"
+											@click="openRiderDialog(item)"
+										/>
 										<v-btn
 											v-for="action in draftActions(item)"
 											:key="`${item.name}-${action}`"
@@ -982,6 +1151,15 @@
 												>
 													{{ draftSourceChipLabel(invoice) }}
 												</v-chip>
+												<v-chip
+													v-if="invoice.posa_order_type"
+													size="small"
+													:color="orderTypeColor(invoice.posa_order_type)"
+													variant="tonal"
+												>
+													<v-icon start size="12">{{ orderTypeIcon(invoice.posa_order_type) }}</v-icon>
+													{{ __(invoice.posa_order_type) }}
+												</v-chip>
 											</div>
 											<div class="invoice-record-card__subtitle">
 												{{
@@ -989,6 +1167,11 @@
 													invoice.customer ||
 													__("Walk-in Customer")
 												}}
+												<span v-if="invoice.custom_rider" class="meta-rider-tag">
+													<v-icon size="12">mdi-moped-outline</v-icon>
+													{{ invoice.custom_rider }}
+													<span v-if="invoice.custom_delivery_status" class="meta-rider-status">· {{ __(invoice.custom_delivery_status) }}</span>
+												</span>
 											</div>
 										</div>
 										<div class="invoice-record-card__amount-block">
@@ -1027,6 +1210,16 @@
 									</div>
 
 									<div class="invoice-record-card__actions">
+										<v-btn
+											icon="mdi-moped-outline"
+											size="small"
+											variant="text"
+											v-if="isDeliveryInvoice(invoice)"
+											:color="invoice.custom_rider ? 'success' : 'warning'"
+											:title="invoice.custom_rider ? __('Update Rider') : __('Assign Rider')"
+											:aria-label="__('Assign rider to invoice')"
+											@click="openRiderDialog(invoice)"
+										/>
 										<v-btn
 											v-for="action in draftActions(invoice)"
 											:key="`${invoice.name}-${action}`"
@@ -1350,6 +1543,37 @@
 							{{ (selectedInvoiceDetail.items || []).length }}
 						</div>
 					</div>
+					<div class="summary-tile" v-if="selectedInvoiceDetail.posa_order_type">
+						<div class="summary-tile__label">{{ __("Order Type") }}</div>
+						<div class="summary-tile__value">
+							<v-chip
+								size="small"
+								:color="orderTypeColor(selectedInvoiceDetail.posa_order_type)"
+								variant="tonal"
+							>
+								<v-icon start size="12">{{ orderTypeIcon(selectedInvoiceDetail.posa_order_type) }}</v-icon>
+								{{ __(selectedInvoiceDetail.posa_order_type) }}
+							</v-chip>
+						</div>
+					</div>
+					<div class="summary-tile" v-if="selectedInvoiceDetail.custom_rider || isDeliveryInvoice(selectedInvoiceDetail)">
+						<div class="summary-tile__label">{{ __("Rider") }}</div>
+						<div class="summary-tile__value text-body-2 font-weight-medium">
+							{{ selectedInvoiceDetail.custom_rider || __("Not Assigned") }}
+						</div>
+					</div>
+					<div class="summary-tile" v-if="selectedInvoiceDetail.custom_delivery_status">
+						<div class="summary-tile__label">{{ __("Delivery Status") }}</div>
+						<div class="summary-tile__value text-body-2 font-weight-medium">
+							{{ __(selectedInvoiceDetail.custom_delivery_status) }}
+						</div>
+					</div>
+					<div class="summary-tile" v-if="selectedInvoiceDetail.custom_rider_trip_reference">
+						<div class="summary-tile__label">{{ __("Trip Reference") }}</div>
+						<div class="summary-tile__value text-body-2 font-weight-medium">
+							{{ selectedInvoiceDetail.custom_rider_trip_reference }}
+						</div>
+					</div>
 				</div>
 				<div class="detail-section__title">{{ __("Items") }}</div>
 				<v-data-table
@@ -1394,6 +1618,15 @@
 			</v-card-text>
 			<v-card-actions>
 				<v-spacer />
+				<v-btn
+					v-if="selectedInvoiceDetail && isDeliveryInvoice(selectedInvoiceDetail)"
+					color="info"
+					variant="text"
+					prepend-icon="mdi-moped-outline"
+					@click="openRiderDialog(selectedInvoiceDetail)"
+				>
+					{{ selectedInvoiceDetail.custom_rider ? __("Update Rider") : __("Assign Rider") }}
+				</v-btn>
 				<v-btn
 					v-if="selectedInvoiceDetail && isRepairCandidate(selectedInvoiceDetail)"
 					color="secondary"
@@ -1559,6 +1792,13 @@ export default {
 		repairChangeLoading: false,
 		detailDialog: false,
 		selectedInvoiceDetail: null,
+		riderDialog: false,
+		riderDialogInvoice: null,
+		riderOptions: [],
+		selectedRider: "",
+		selectedDeliveryStatus: "Assigned",
+		riderSaving: false,
+		deliveryStatusOptions: ["Not Assigned", "Assigned", "Accepted", "Picked Up", "Out for Delivery", "Delivered", "Failed"],
 		partialStatusItems: ["All", "Partly Paid", "Unpaid", "Overdue"],
 		historyStatusItems: ["All", "Paid", "Partly Paid", "Unpaid", "Overdue", "Credit Note Issued"],
 		partialHeaders: [
@@ -1576,6 +1816,7 @@ export default {
 			{ title: __("Invoice"), key: "name" },
 			{ title: __("Customer"), key: "customer_name" },
 			{ title: __("Posting"), key: "posting_date" },
+			{ title: __("Order Type"), key: "posa_order_type" },
 			{ title: __("Status"), key: "status" },
 			{ title: __("Total"), key: "grand_total", align: "end" },
 			{ title: __("Tendered"), key: "paid_amount", align: "end" },
@@ -2123,6 +2364,10 @@ export default {
 				"pos_profile",
 				"owner",
 				"modified_by",
+				"posa_order_type",
+				"custom_rider",
+				"custom_delivery_status",
+				"custom_rider_trip_reference",
 				...extraFields,
 			];
 		},
@@ -2223,6 +2468,69 @@ export default {
 			if (state === "repaired") return "success";
 			if (state === "candidate") return "warning";
 			return "primary";
+		},
+		orderTypeColor(orderType) {
+			const t = (orderType || "").toLowerCase();
+			if (t === "delivery") return "info";
+			if (t === "takeaway" || t === "take away") return "secondary";
+			return "primary";
+		},
+		orderTypeIcon(orderType) {
+			const t = (orderType || "").toLowerCase();
+			if (t === "delivery") return "mdi-moped-outline";
+			if (t === "takeaway" || t === "take away") return "mdi-shopping-outline";
+			return "mdi-silverware-fork-knife";
+		},
+		isDeliveryInvoice(invoice) {
+			return (invoice?.posa_order_type || "").toLowerCase() === "delivery";
+		},
+		async openRiderDialog(invoice) {
+			this.riderDialogInvoice = invoice;
+			this.selectedRider = invoice.custom_rider || "";
+			this.selectedDeliveryStatus = invoice.custom_delivery_status || "Not Assigned";
+			this.riderDialog = true;
+			// Load riders if not yet loaded
+			if (!this.riderOptions.length) {
+				try {
+					const { message } = await frappe.call({
+						method: "frappe.client.get_list",
+						args: {
+							doctype: "Rider Profile",
+							fields: ["name"],
+							order_by: "name asc",
+							limit_page_length: 0,
+						},
+					});
+					this.riderOptions = Array.isArray(message) ? message : [];
+				} catch (e) {
+					console.error("Error loading riders:", e);
+					this.riderOptions = [];
+				}
+			}
+		},
+		async saveRiderAssignment() {
+			if (!this.riderDialogInvoice) return;
+			this.riderSaving = true;
+			try {
+				const doctype = this.riderDialogInvoice.doctype || this.currentInvoiceDoctype || "Sales Invoice";
+				await frappe.call({
+					method: "posawesome.posawesome.api.invoices.assign_rider",
+					args: {
+						doctype,
+						name: this.riderDialogInvoice.name,
+						rider: this.selectedRider || "",
+						delivery_status: this.selectedRider ? this.selectedDeliveryStatus : "Not Assigned",
+					},
+				});
+				this.toastStore.show({ title: __("Rider assigned and payment entry created successfully"), color: "success" });
+				this.riderDialog = false;
+				await this.refreshAll();
+			} catch (error) {
+				console.error("Error saving rider:", error);
+				this.toastStore.show({ title: __("Unable to assign rider"), color: "error" });
+			} finally {
+				this.riderSaving = false;
+			}
 		},
 		isRepairCandidate(invoice) {
 			const repairState =
@@ -3309,5 +3617,19 @@ export default {
 		width: 100%;
 		text-align: center;
 	}
+}
+
+.meta-rider-tag {
+	display: inline-flex;
+	align-items: center;
+	gap: 3px;
+	margin-left: 6px;
+	font-size: 0.78rem;
+	color: var(--pos-text-secondary, rgba(100,116,139,0.9));
+	font-style: italic;
+}
+
+.meta-rider-status {
+	opacity: 0.8;
 }
 </style>

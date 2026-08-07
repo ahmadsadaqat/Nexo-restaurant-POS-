@@ -103,6 +103,9 @@ after_migrate = []
 # Hook on document methods and events
 
 doc_events = {
+    "POS Profile": {
+        "validate": "posawesome.posawesome.api.pos_profile.validate_pos_profile",
+    },
     "Sales Invoice": {
         "validate": "posawesome.posawesome.api.invoice.validate",
         "before_submit": "posawesome.posawesome.api.invoice.before_submit",
@@ -206,6 +209,11 @@ fixtures = [
                     "POS Profile-posa_pos_awesome_settings",
                     "POS Profile-posa_restaurant_mode",
                     "POS Profile-posa_order_types",
+                    "POS Profile-posa_section_custom_order_types",
+                    "POS Profile-posa_use_custom_order_types",
+                    "POS Profile-posa_custom_order_types",
+                    "POS Profile Order Type-allow_table_selection",
+                    "POS Profile Order Type-allow_rider_selection",
                     "POS Invoice-posa_table_no",
                     "POS Invoice-posa_order_type",
                     "Sales Invoice-posa_table_no",

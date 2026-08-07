@@ -2,7 +2,7 @@
 	<div class="sticky-header">
 		<v-row class="items">
 			<template v-if="posProfile.posa_restaurant_mode">
-				<v-col cols="6" sm="3" class="pb-0" v-if="orderType !== 'Delivery'">
+				<v-col cols="6" sm="3" class="pb-0" v-if="showTableSelector">
 					<v-select
 						v-if="restaurantTables.length"
 						:label="__('Table')"
@@ -27,7 +27,7 @@
 						density="compact"
 					></v-text-field>
 				</v-col>
-				<v-col cols="6" sm="3" class="pb-0" v-if="orderType === 'Delivery'">
+				<v-col cols="6" sm="3" class="pb-0" v-if="showRiderSelector">
 					<v-autocomplete
 						:label="__('Rider')"
 						:items="riders"
@@ -429,11 +429,43 @@ const fetchTables = async (profile) => {
 	}
 };
 
+const applyDefaultOrderType = (profile) => {
+	if (!profile) return;
+	if (
+		profile.posa_use_custom_order_types &&
+		Array.isArray(profile.posa_custom_order_types) &&
+		profile.posa_custom_order_types.length > 0
+	) {
+		// Check if current orderType exists in the profile's allowed types
+		const allowedTypes = profile.posa_custom_order_types
+			.map((r) => (r.order_type || "").trim().toLowerCase())
+			.filter(Boolean);
+		const currentTypeNorm = (orderType.value || "").trim().toLowerCase();
+		const isCurrentAllowed = currentTypeNorm && allowedTypes.includes(currentTypeNorm);
+
+		// Only apply default if no orderType set yet, or current type isn't in allowed list
+		if (!isCurrentAllowed) {
+			const defaultRow =
+				profile.posa_custom_order_types.find(
+					(row) =>
+						row.is_default === 1 ||
+						row.is_default === "1" ||
+						row.is_default === true ||
+						Boolean(Number(row.is_default)),
+				) || profile.posa_custom_order_types[0];
+			if (defaultRow && defaultRow.order_type) {
+				invoiceStore.setOrderType(defaultRow.order_type);
+			}
+		}
+	}
+};
+
 watch(
 	() => props.posProfile,
 	(newVal) => {
 		fetchTables(newVal);
 		fetchRiders(newVal);
+		applyDefaultOrderType(newVal);
 	},
 	{ immediate: true, deep: true },
 );
@@ -462,12 +494,66 @@ onBeforeUnmount(() => {
 });
 
 const orderTypeOptions = computed(() => {
+	if (
+		props.posProfile?.posa_use_custom_order_types &&
+		Array.isArray(props.posProfile?.posa_custom_order_types) &&
+		props.posProfile.posa_custom_order_types.length > 0
+	) {
+		return props.posProfile.posa_custom_order_types
+			.map((row) => {
+				const typeVal = typeof row === "string" ? row : row?.order_type || "";
+				return { title: translate(typeVal), value: typeVal };
+			})
+			.filter((opt) => opt.value);
+	}
 	const typesStr = props.posProfile?.posa_order_types || "Dine In, Takeaway, Delivery";
 	const types = typesStr
 		.split(",")
 		.map((t) => t.trim())
 		.filter((t) => t);
 	return types.map((t) => ({ title: translate(t), value: t }));
+});
+
+const showTableSelector = computed(() => {
+	const currentType = (orderType.value || "").trim().toLowerCase();
+	if (!currentType) return false;
+
+	if (
+		props.posProfile?.posa_use_custom_order_types &&
+		Array.isArray(props.posProfile?.posa_custom_order_types)
+	) {
+		const row = props.posProfile.posa_custom_order_types.find(
+			(r) => (r.order_type || "").trim().toLowerCase() === currentType
+		);
+		if (row && (row.allow_table_selection === 1 || row.allow_table_selection === "1" || row.allow_table_selection === true)) {
+			return true;
+		}
+		if (row && (row.allow_table_selection === 0 || row.allow_table_selection === "0" || row.allow_table_selection === false)) {
+			return false;
+		}
+	}
+	return currentType === "dine in" || currentType === "dine-in";
+});
+
+const showRiderSelector = computed(() => {
+	const currentType = (orderType.value || "").trim().toLowerCase();
+	if (!currentType) return false;
+
+	if (
+		props.posProfile?.posa_use_custom_order_types &&
+		Array.isArray(props.posProfile?.posa_custom_order_types)
+	) {
+		const row = props.posProfile.posa_custom_order_types.find(
+			(r) => (r.order_type || "").trim().toLowerCase() === currentType
+		);
+		if (row && (row.allow_rider_selection === 1 || row.allow_rider_selection === "1" || row.allow_rider_selection === true)) {
+			return true;
+		}
+		if (row && (row.allow_rider_selection === 0 || row.allow_rider_selection === "0" || row.allow_rider_selection === false)) {
+			return false;
+		}
+	}
+	return currentType === "delivery";
 });
 
 const blurTarget = (event) => {

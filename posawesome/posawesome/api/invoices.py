@@ -5,6 +5,8 @@
 
 import frappe
 import time
+from frappe import _
+from frappe.utils import flt
 from posawesome.posawesome.api.erpnext_compat import resolve_make_sales_invoice_from_order
 from posawesome.posawesome.api.tax_contracts import apply_pos_tax_inclusion_contract
 from posawesome.posawesome.api.invoice_processing.utils import (
@@ -90,6 +92,10 @@ def get_draft_invoices(
             "pos_profile",
             "owner",
             "modified_by",
+            "posa_order_type",
+            "custom_rider",
+            "custom_delivery_status",
+            "custom_rider_trip_reference",
         ],
         limit_page_length=limit_page_length,
         order_by="modified desc",
@@ -198,3 +204,138 @@ def update_invoice_from_order(data):
     """Backward-compatible facade used by order-to-invoice flow."""
 
     return update_invoice(data)
+
+
+def make_automatic_payment_for_invoice(doctype, name):
+    """Automatically create and submit a Payment Entry for unpaid delivery invoices upon rider assignment."""
+
+    if doctype not in ("Sales Invoice", "POS Invoice"):
+        return
+
+    doc = frappe.get_doc(doctype, name)
+
+    # 1. Handle Draft Document (docstatus == 0)
+    if doc.docstatus == 0:
+        mode_of_payment = None
+        if hasattr(doc, "pos_profile") and doc.pos_profile:
+            mode_of_payment = frappe.db.get_value("POS Profile", doc.pos_profile, "posa_cash_mode_of_payment")
+        if not mode_of_payment:
+            mode_of_payment = "Cash"
+
+        cash_account = (
+            frappe.db.get_value(
+                "Mode of Payment Account",
+                {"parent": mode_of_payment, "company": doc.company},
+                "default_account",
+            )
+            or frappe.get_value("Company", doc.company, "default_cash_account")
+        )
+
+        if hasattr(doc, "payments"):
+            current_paid = sum(flt(p.amount) for p in doc.payments)
+            needed = flt(doc.grand_total) - current_paid
+            if needed > 0:
+                doc.append(
+                    "payments",
+                    {
+                        "mode_of_payment": mode_of_payment,
+                        "amount": needed,
+                        "account": cash_account,
+                        "type": "Cash",
+                    },
+                )
+            doc.paid_amount = flt(doc.grand_total)
+            doc.outstanding_amount = 0
+
+        doc.flags.ignore_permissions = True
+        doc.flags.ignore_mandatory = True
+        doc.save()
+        try:
+            doc.submit()
+        except Exception:
+            frappe.log_error(frappe.get_traceback(), "Auto Submit Draft Invoice Error")
+        return
+
+    # 2. Handle Submitted Document (docstatus == 1) with outstanding balance
+    if doc.docstatus == 1 and flt(doc.outstanding_amount) > 0:
+        from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry
+
+        pe = get_payment_entry(doctype, name)
+
+        if not pe.mode_of_payment:
+            mode_of_payment = None
+            if hasattr(doc, "pos_profile") and doc.pos_profile:
+                mode_of_payment = frappe.db.get_value(
+                    "POS Profile", doc.pos_profile, "posa_cash_mode_of_payment"
+                )
+            if not mode_of_payment:
+                mode_of_payment = "Cash"
+            pe.mode_of_payment = mode_of_payment
+
+        if not pe.paid_to:
+            cash_account = (
+                frappe.db.get_value(
+                    "Mode of Payment Account",
+                    {"parent": pe.mode_of_payment, "company": doc.company},
+                    "default_account",
+                )
+                or frappe.get_value("Company", doc.company, "default_cash_account")
+            )
+            pe.paid_to = cash_account
+
+        pe.flags.ignore_permissions = True
+        pe.insert(ignore_permissions=True)
+        pe.submit()
+
+
+@frappe.whitelist()
+def assign_rider(doctype, name, rider=None, delivery_status=None, trip_reference=None):
+    if not doctype or not name:
+        frappe.throw(_("Document type and name are required"))
+
+    if not frappe.db.exists(doctype, name):
+        frappe.throw(_("{0} {1} does not exist").format(doctype, name))
+
+    rider = str(rider or "").strip()
+    status = str(delivery_status or ("Assigned" if rider else "Not Assigned")).strip()
+
+    updates = {
+        "custom_rider": rider,
+        "custom_delivery_status": status,
+    }
+    if trip_reference is not None:
+        updates["custom_rider_trip_reference"] = str(trip_reference).strip()
+
+    frappe.db.set_value(doctype, name, updates)
+
+    # Automatically process payment entry when assigning a rider
+    if rider:
+        try:
+            make_automatic_payment_for_invoice(doctype, name)
+        except Exception as e:
+            frappe.log_error(
+                frappe.get_traceback(),
+                "Automatic Payment Creation on Rider Assignment Failed",
+            )
+
+    updated_doc = (
+        frappe.db.get_value(
+            doctype,
+            name,
+            ["custom_rider", "custom_delivery_status", "outstanding_amount", "status", "paid_amount"],
+            as_dict=True,
+        )
+        or {}
+    )
+
+    return {
+        "doctype": doctype,
+        "name": name,
+        "custom_rider": updated_doc.get("custom_rider", rider),
+        "custom_delivery_status": updated_doc.get("custom_delivery_status", status),
+        "outstanding_amount": flt(updated_doc.get("outstanding_amount", 0)),
+        "status": updated_doc.get("status", "Paid"),
+        "paid_amount": flt(updated_doc.get("paid_amount", 0)),
+    }
+
+

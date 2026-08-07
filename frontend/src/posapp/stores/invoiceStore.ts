@@ -230,7 +230,7 @@ export const useInvoiceStore = defineStore("invoice", () => {
 		invoiceDoc.value = normalizeDoc(doc);
 		if (invoiceDoc.value) {
 			tableNo.value = invoiceDoc.value.posa_table_no || "";
-			orderType.value = invoiceDoc.value.posa_order_type || "Dine In";
+			orderType.value = invoiceDoc.value.posa_order_type || orderType.value || "";
 		}
 		touch();
 	};
@@ -264,7 +264,7 @@ export const useInvoiceStore = defineStore("invoice", () => {
 	const deliveryChargesRate = ref(0);
 	const selectedDeliveryCharge = ref("");
 	const tableNo = ref("");
-	const orderType = ref("Dine In");
+	const orderType = ref("");
 	const customRider = ref("");
 	/**
 	 * `true` when `invoiceType` is `"Order"` or `"Quotation"`.
@@ -626,7 +626,6 @@ export const useInvoiceStore = defineStore("invoice", () => {
 			additionalDiscountPercentage.value = 0;
 			resetDeliveryCharges();
 			tableNo.value = "";
-			orderType.value = "Dine In";
 			customRider.value = "";
 		}
 
