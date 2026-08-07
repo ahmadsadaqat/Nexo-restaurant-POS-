@@ -359,3 +359,10 @@ def validate_shift(doc):
         # check if shift is for the same company
         if shift.company != doc.company:
             frappe.throw(_("POS Opening Shift {0} is not for the same company").format(shift.name))
+
+
+@frappe.whitelist()
+def get_invoice_list(*args, **kwargs):
+    from posawesome.posawesome.api.invoices import get_invoice_list as _get_invoice_list
+
+    return _get_invoice_list(*args, **kwargs)

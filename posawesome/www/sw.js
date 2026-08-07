@@ -13,6 +13,18 @@ const STATIC_PRECACHE_URLS = [
 
 const NON_CACHEABLE_PATHS = new Set(["/assets/posawesome/dist/js/posawesome.js"]);
 
+function shouldBypassCache(url) {
+	if (!url) return false;
+	const pathname = url.pathname || "";
+	if (NON_CACHEABLE_PATHS.has(pathname)) {
+		return true;
+	}
+	if (pathname.startsWith("/api/")) {
+		return true;
+	}
+	return false;
+}
+
 function pickAssetUrl(assets, key, fallbackPath, version) {
 	// Entries are now content-hashed at build time (see
 	// build-manifest.js). The hashed filename is published in
