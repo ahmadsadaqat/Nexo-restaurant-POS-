@@ -982,11 +982,12 @@ export default {
 			}
 
 			// Save the invoice as an unpaid invoice (Draft)
+			let saved_invoice = null;
 			let saved_invoice_name = "";
 			try {
 				this.toastStore.show({ message: this.__("Saving invoice..."), color: "info" });
 				const doc = this.get_invoice_doc();
-				const saved_invoice = await this.update_invoice(doc);
+				saved_invoice = await this.update_invoice(doc);
 				if (!saved_invoice) {
 					this.toastStore.show({ message: this.__("Failed to save invoice"), color: "error" });
 					return;
