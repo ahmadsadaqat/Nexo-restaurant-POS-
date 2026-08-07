@@ -11,7 +11,7 @@ new_fields = [
         "dt": "POS Profile",
         "fieldname": "posa_enable_kot_printing",
         "fieldtype": "Check",
-        "insert_after": "posa_enable_print_audit",
+        "insert_after": "print_format",
         "label": "Enable KOT Printing",
         "module": "POSAwesome"
     },
@@ -24,7 +24,7 @@ new_fields = [
         "options": "POSA Printer Profile",
         "insert_after": "posa_enable_kot_printing",
         "label": "KOT Printer Profile",
-        "depends_on": "eval:doc.posa_enable_kot_printing",
+        "depends_on": "eval:doc.posa_enable_kot_printing==1",
         "module": "POSAwesome"
     },
     {
