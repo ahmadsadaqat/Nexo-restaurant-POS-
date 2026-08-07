@@ -2739,7 +2739,7 @@ export default {
 					outstanding_amount: [">", 0],
 				});
 				const { message } = await frappe.call({
-					method: "frappe.client.get_list",
+					method: "posawesome.posawesome.api.invoices.get_invoice_list",
 					args: {
 						doctype: this.currentInvoiceDoctype,
 						filters,
@@ -2778,7 +2778,7 @@ export default {
 				const results = await Promise.all(
 					doctypes.map(async (doctype) => {
 						const { message } = await frappe.call({
-							method: "frappe.client.get_list",
+							method: "posawesome.posawesome.api.invoices.get_invoice_list",
 							args: {
 								doctype,
 								filters,

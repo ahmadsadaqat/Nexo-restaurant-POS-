@@ -78,25 +78,28 @@ def get_draft_invoices(
     if frappe.db.has_column(doctype, "posa_is_printed"):
         filters["posa_is_printed"] = 0
 
+    requested_fields = [
+        "name",
+        "customer",
+        "customer_name",
+        "posting_date",
+        "posting_time",
+        "grand_total",
+        "currency",
+        "pos_profile",
+        "owner",
+        "modified_by",
+        "posa_order_type",
+        "custom_rider",
+        "custom_delivery_status",
+        "custom_rider_trip_reference",
+    ]
+    fields = [f for f in requested_fields if frappe.db.has_column(doctype, f)]
+
     invoices_list = frappe.get_list(
         doctype,
         filters=filters,
-        fields=[
-            "name",
-            "customer",
-            "customer_name",
-            "posting_date",
-            "posting_time",
-            "grand_total",
-            "currency",
-            "pos_profile",
-            "owner",
-            "modified_by",
-            "posa_order_type",
-            "custom_rider",
-            "custom_delivery_status",
-            "custom_rider_trip_reference",
-        ],
+        fields=fields,
         limit_page_length=limit_page_length,
         order_by="modified desc",
     )
@@ -109,6 +112,55 @@ def get_draft_invoices(
         rows=len(invoices_list),
     )
     return invoices_list
+
+
+@frappe.whitelist()
+def get_invoice_list(
+    doctype="Sales Invoice",
+    filters=None,
+    fields=None,
+    order_by=None,
+    limit_page_length=0,
+):
+    if isinstance(filters, str):
+        filters = frappe.parse_json(filters)
+    if isinstance(fields, str):
+        fields = frappe.parse_json(fields)
+
+    fields = fields or [
+        "name",
+        "customer",
+        "customer_name",
+        "posting_date",
+        "posting_time",
+        "grand_total",
+        "paid_amount",
+        "outstanding_amount",
+        "status",
+        "currency",
+        "pos_profile",
+        "owner",
+        "modified_by",
+        "posa_order_type",
+        "custom_rider",
+        "custom_delivery_status",
+        "custom_rider_trip_reference",
+    ]
+
+    valid_fields = [f for f in fields if frappe.db.has_column(doctype, f)]
+
+    try:
+        limit_page_length = int(limit_page_length or 0)
+    except (TypeError, ValueError):
+        limit_page_length = 0
+
+    return frappe.get_list(
+        doctype,
+        filters=filters,
+        fields=valid_fields,
+        order_by=order_by,
+        limit_page_length=limit_page_length,
+    )
 
 
 @frappe.whitelist()
