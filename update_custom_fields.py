@@ -26,6 +26,18 @@ new_fields = [
         "label": "KOT Printer Profile",
         "depends_on": "eval:doc.posa_enable_kot_printing",
         "module": "POSAwesome"
+    },
+    {
+        "docstatus": 0,
+        "doctype": "Custom Field",
+        "dt": "POS Profile",
+        "fieldname": "posa_kot_print_format",
+        "fieldtype": "Link",
+        "options": "Print Format",
+        "insert_after": "posa_kot_printer_profile",
+        "label": "KOT Print Format",
+        "depends_on": "eval:doc.posa_enable_kot_printing==1",
+        "module": "POSAwesome"
     }
 ]
 

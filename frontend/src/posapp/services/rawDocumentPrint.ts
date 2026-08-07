@@ -1,4 +1,4 @@
-import { sendRawToQz } from "./qzTray";
+import { sendRawToQz, printDocumentViaQz } from "./qzTray";
 import { parseBooleanSetting } from "../utils/stock";
 
 declare const frappe: any;
@@ -423,12 +423,24 @@ export async function printKotDocumentViaQz(options: RawDocumentPrintOptions) {
 		return;
 	}
 
+	const kotPrintFormat = options.profile?.posa_kot_print_format;
+	const kotPrinterProfileName = options.profile?.posa_kot_printer_profile;
+
+	if (kotPrintFormat) {
+		await printDocumentViaQz({
+			doctype: options.doctype,
+			name: options.name,
+			printFormat: kotPrintFormat,
+			printerName: kotPrinterProfileName,
+		});
+		return;
+	}
+
 	const doc = await loadDocument(options);
 	if (!doc) {
 		throw new Error(translate("Unable to load document for KOT printing."));
 	}
 	
-	const kotPrinterProfileName = options.profile?.posa_kot_printer_profile;
 	if (!kotPrinterProfileName) {
 		console.warn(translate("KOT Printer Profile is not configured in POS Profile."));
 		return;
