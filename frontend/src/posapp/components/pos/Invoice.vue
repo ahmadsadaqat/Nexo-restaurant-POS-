@@ -1026,7 +1026,7 @@ export default {
 						this.pos_profile.custom_branch || this.pos_profile.branch || this.pos_profile.company,
 					invoice_no: saved_invoice_name,
 				};
-				const response = await window.frappe.call({
+				const response = await frappe.call({
 					method: "nexo_kds.api.create_kot",
 					args: {
 						payload: JSON.stringify(payload),
@@ -1059,8 +1059,11 @@ export default {
 					});
 				}
 			} catch (e) {
-				console.error(e);
-				this.toastStore.show({ message: this.__("Error creating KOT"), color: "error" });
+				console.error("Error creating KOT:", e);
+				this.toastStore.show({
+					message: this.__("Error creating KOT: ") + (e.message || e),
+					color: "error",
+				});
 			}
 		},
 
