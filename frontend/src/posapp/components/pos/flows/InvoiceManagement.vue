@@ -3202,11 +3202,16 @@ export default {
 				}
 			}
 
-			const kotPrintFormat = profile.posa_kot_print_format || "KOT Print Format";
+			const kotPrintFormat = profile.custom_reprint_kot_format || profile.posa_kot_print_format || "KOT Print Format";
 			const letterHead = profile.letter_head || 0;
 			const debugPrint = isDebugPrintEnabled();
 			const useConfiguredQzPrint = shouldUseConfiguredQzDocumentPrinting(profile);
 			const useRawPrint = shouldUseRawDocumentPrinting(profile);
+
+			const isParcelOrder = (invoice.posa_order_type || "").toLowerCase().includes("takeaway") || (invoice.posa_order_type || "").toLowerCase().includes("parcel") || (invoice.posa_order_type || "").toLowerCase().includes("delivery");
+			const configuredPrinter = isParcelOrder
+				? (profile.custom_parcel_order_printer || profile.posa_kot_printer_profile || null)
+				: (profile.custom_table_order_printer || profile.posa_kot_printer_profile || null);
 
 			let url =
 				frappe.urllib.get_base_url() +
@@ -3230,7 +3235,7 @@ export default {
 						doc: invoice,
 						profile,
 						printFormat: kotPrintFormat,
-						printerName: profile.posa_kot_printer_profile || null,
+						printerName: configuredPrinter,
 						letterhead: letterHead || null,
 						noLetterhead: letterHead ? "0" : "1",
 					});

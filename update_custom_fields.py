@@ -79,12 +79,75 @@ new_fields = [
         "depends_on": "eval:doc.posa_enable_rider_dispatch_printing==1",
         "module": "POSAwesome",
     },
+    {
+        "docstatus": 0,
+        "doctype": "Custom Field",
+        "name": "POS Profile-custom_column_break_wwq3q",
+        "dt": "POS Profile",
+        "fieldname": "custom_column_break_wwq3q",
+        "fieldtype": "Column Break",
+        "insert_after": "posa_rider_dispatch_print_format",
+        "module": "POSAwesome",
+    },
+    {
+        "docstatus": 0,
+        "doctype": "Custom Field",
+        "name": "POS Profile-custom_enable_kot_reprint",
+        "dt": "POS Profile",
+        "fieldname": "custom_enable_kot_reprint",
+        "fieldtype": "Check",
+        "insert_after": "custom_column_break_wwq3q",
+        "label": "Enable KOT Reprint",
+        "module": "POSAwesome",
+    },
+    {
+        "docstatus": 0,
+        "doctype": "Custom Field",
+        "name": "POS Profile-custom_reprint_kot_format",
+        "dt": "POS Profile",
+        "fieldname": "custom_reprint_kot_format",
+        "fieldtype": "Link",
+        "options": "Print Format",
+        "insert_after": "custom_enable_kot_reprint",
+        "label": "Reprint KOT Format",
+        "depends_on": "eval:doc.custom_enable_kot_reprint==1",
+        "module": "POSAwesome",
+    },
+    {
+        "docstatus": 0,
+        "doctype": "Custom Field",
+        "name": "POS Profile-custom_table_order_printer",
+        "dt": "POS Profile",
+        "fieldname": "custom_table_order_printer",
+        "fieldtype": "Link",
+        "options": "POSA Printer Profile",
+        "insert_after": "custom_reprint_kot_format",
+        "label": "Table Order Printer",
+        "depends_on": "eval:doc.custom_enable_kot_reprint==1",
+        "module": "POSAwesome",
+    },
+    {
+        "docstatus": 0,
+        "doctype": "Custom Field",
+        "name": "POS Profile-custom_parcel_order_printer",
+        "dt": "POS Profile",
+        "fieldname": "custom_parcel_order_printer",
+        "fieldtype": "Link",
+        "options": "POSA Printer Profile",
+        "insert_after": "custom_table_order_printer",
+        "label": "Parcel Order Printer",
+        "depends_on": "eval:doc.custom_enable_kot_reprint==1",
+        "module": "POSAwesome",
+    },
 ]
 
-# Avoid duplicates
-existing_fields = {f.get("fieldname") for f in data if f.get("dt") == "POS Profile"}
+# Update or append custom field definitions in data
+existing_fields = {f.get("fieldname"): idx for idx, f in enumerate(data) if f.get("dt") == "POS Profile"}
 for nf in new_fields:
-    if nf["fieldname"] not in existing_fields:
+    fn = nf["fieldname"]
+    if fn in existing_fields:
+        data[existing_fields[fn]].update(nf)
+    else:
         data.append(nf)
 
 with open("posawesome/fixtures/custom_field.json", "w") as f:

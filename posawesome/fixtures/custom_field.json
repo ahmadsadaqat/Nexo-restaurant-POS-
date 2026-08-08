@@ -10637,5 +10637,65 @@
   "label": "Rider Dispatch Print Format",
   "depends_on": "eval:doc.posa_enable_rider_dispatch_printing==1",
   "module": "POSAwesome"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Custom Field",
+  "name": "POS Profile-custom_column_break_wwq3q",
+  "dt": "POS Profile",
+  "fieldname": "custom_column_break_wwq3q",
+  "fieldtype": "Column Break",
+  "insert_after": "posa_rider_dispatch_print_format",
+  "module": "POSAwesome"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Custom Field",
+  "name": "POS Profile-custom_enable_kot_reprint",
+  "dt": "POS Profile",
+  "fieldname": "custom_enable_kot_reprint",
+  "fieldtype": "Check",
+  "insert_after": "custom_column_break_wwq3q",
+  "label": "Enable KOT Reprint",
+  "module": "POSAwesome"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Custom Field",
+  "name": "POS Profile-custom_reprint_kot_format",
+  "dt": "POS Profile",
+  "fieldname": "custom_reprint_kot_format",
+  "fieldtype": "Link",
+  "options": "Print Format",
+  "insert_after": "custom_enable_kot_reprint",
+  "label": "Reprint KOT Format",
+  "depends_on": "eval:doc.custom_enable_kot_reprint==1",
+  "module": "POSAwesome"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Custom Field",
+  "name": "POS Profile-custom_table_order_printer",
+  "dt": "POS Profile",
+  "fieldname": "custom_table_order_printer",
+  "fieldtype": "Link",
+  "options": "POSA Printer Profile",
+  "insert_after": "custom_reprint_kot_format",
+  "label": "Table Order Printer",
+  "depends_on": "eval:doc.custom_enable_kot_reprint==1",
+  "module": "POSAwesome"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Custom Field",
+  "name": "POS Profile-custom_parcel_order_printer",
+  "dt": "POS Profile",
+  "fieldname": "custom_parcel_order_printer",
+  "fieldtype": "Link",
+  "options": "POSA Printer Profile",
+  "insert_after": "custom_table_order_printer",
+  "label": "Parcel Order Printer",
+  "depends_on": "eval:doc.custom_enable_kot_reprint==1",
+  "module": "POSAwesome"
  }
 ]
