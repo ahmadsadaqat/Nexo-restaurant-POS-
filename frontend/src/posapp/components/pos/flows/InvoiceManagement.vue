@@ -821,6 +821,16 @@
 											@click="openRiderDialog(item)"
 										/>
 										<v-btn
+											v-if="isDeliveryInvoice(item)"
+											icon="mdi-truck-delivery-outline"
+											variant="text"
+											size="small"
+											color="purple"
+											:title="__('Reprint Rider Dispatch')"
+											:aria-label="__('Reprint Rider Dispatch invoice')"
+											@click="printRiderDispatchInvoice(item)"
+										/>
+										<v-btn
 											icon="mdi-cash-plus"
 											variant="text"
 											size="small"
@@ -982,6 +992,16 @@
 											:title="invoice.custom_rider ? __('Update Rider') : __('Assign Rider')"
 											:aria-label="__('Assign rider to invoice')"
 											@click="openRiderDialog(invoice)"
+										/>
+										<v-btn
+											icon="mdi-truck-delivery-outline"
+											size="small"
+											variant="text"
+											v-if="isDeliveryInvoice(invoice)"
+											color="purple"
+											:title="__('Reprint Rider Dispatch')"
+											:aria-label="__('Reprint Rider Dispatch invoice')"
+											@click="printRiderDispatchInvoice(invoice)"
 										/>
 										<v-btn
 											prepend-icon="mdi-cash-plus"
@@ -1664,6 +1684,15 @@
 					@click="openRiderDialog(selectedInvoiceDetail)"
 				>
 					{{ selectedInvoiceDetail.custom_rider ? __("Update Rider") : __("Assign Rider") }}
+				</v-btn>
+				<v-btn
+					v-if="selectedInvoiceDetail && isDeliveryInvoice(selectedInvoiceDetail)"
+					color="purple"
+					variant="text"
+					prepend-icon="mdi-truck-delivery-outline"
+					@click="printRiderDispatchInvoice(selectedInvoiceDetail)"
+				>
+					{{ __("Reprint Rider Dispatch") }}
 				</v-btn>
 				<v-btn
 					v-if="selectedInvoiceDetail && isRepairCandidate(selectedInvoiceDetail)"
@@ -2521,7 +2550,9 @@ export default {
 			return "mdi-silverware-fork-knife";
 		},
 		isDeliveryInvoice(invoice) {
-			return (invoice?.posa_order_type || "").toLowerCase() === "delivery";
+			if (!invoice) return false;
+			const orderType = String(invoice.posa_order_type || invoice.order_type || "").toLowerCase().trim();
+			return orderType === "delivery" || orderType.includes("delivery") || !!invoice.custom_rider || !!invoice.custom_delivery_status || !!invoice.is_delivery;
 		},
 		async openRiderDialog(invoice) {
 			this.riderDialogInvoice = invoice;
