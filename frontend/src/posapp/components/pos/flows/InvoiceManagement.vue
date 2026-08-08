@@ -378,6 +378,15 @@
 											@click="viewInvoice(item)"
 										/>
 										<v-btn
+											icon="mdi-printer-pos"
+											variant="text"
+											size="small"
+											color="deep-orange"
+											:title="__('Reprint KOT')"
+											:aria-label="__('Reprint KOT invoice')"
+											@click="printKotInvoice(item)"
+										/>
+										<v-btn
 											icon="mdi-printer-outline"
 											variant="text"
 											size="small"
@@ -536,6 +545,15 @@
 											:title="__('View Details')"
 											:aria-label="__('View invoice details')"
 											@click="viewInvoice(invoice)"
+										/>
+										<v-btn
+											icon="mdi-printer-pos"
+											size="small"
+											variant="text"
+											color="deep-orange"
+											:title="__('Reprint KOT')"
+											:aria-label="__('Reprint KOT invoice')"
+											@click="printKotInvoice(invoice)"
 										/>
 										<v-btn
 											icon="mdi-printer-outline"
@@ -1683,6 +1701,7 @@ import {
 	shouldUseConfiguredQzDocumentPrinting,
 	shouldUseRawDocumentPrinting,
 } from "../../../services/documentPrint";
+import { printKotDocumentViaQz } from "../../../services/rawDocumentPrint";
 import { isOffline, updateOfflineInvoiceRider, getOfflineInvoices } from "../../../../offline/index";
 import { buildInvoicePdfUrl, shouldDownloadPdfForShareError } from "../../../utils/invoiceSharing";
 import DocumentSourceSelector from "../shared/DocumentSourceSelector.vue";
@@ -3110,6 +3129,83 @@ export default {
 				silentPrint(url, printOptions);
 				return;
 			}
+			const printWindow = window.open(url, "Print");
+			if (printWindow) watchPrintWindow(printWindow, printOptions);
+		},
+		async printKotInvoice(invoice) {
+			const profile = this.posProfile;
+			if (!invoice?.name || !profile) return;
+			const doctype = invoice.doctype || this.currentInvoiceDoctype;
+
+			if (profile.posa_enable_kot_printing) {
+				try {
+					await printKotDocumentViaQz({
+						doctype,
+						name: invoice.name,
+						doc: invoice,
+						profile,
+					});
+					return;
+				} catch (error) {
+					console.warn("KOT QZ print failed", error);
+				}
+			}
+
+			const kotPrintFormat = profile.posa_kot_print_format || "KOT Print Format";
+			const letterHead = profile.letter_head || 0;
+			const debugPrint = isDebugPrintEnabled();
+			const useConfiguredQzPrint = shouldUseConfiguredQzDocumentPrinting(profile);
+			const useRawPrint = shouldUseRawDocumentPrinting(profile);
+
+			let url =
+				frappe.urllib.get_base_url() +
+				"/printview?doctype=" +
+				encodeURIComponent(doctype) +
+				"&name=" +
+				encodeURIComponent(invoice.name) +
+				"&trigger_print=1&format=" +
+				encodeURIComponent(kotPrintFormat) +
+				"&no_letterhead=" +
+				(letterHead ? "0" : "1");
+			if (letterHead) url += "&letterhead=" + encodeURIComponent(letterHead);
+			url = appendDebugPrintParam(url, debugPrint);
+			const printOptions = { allowOfflineFallback: isOffline(), triggerPrint: "1", debugPrint };
+
+			if (useConfiguredQzPrint && !isOffline()) {
+				try {
+					await printDocumentViaConfiguredQz({
+						doctype,
+						name: invoice.name,
+						doc: invoice,
+						profile,
+						printFormat: kotPrintFormat,
+						printerName: profile.posa_kot_printer_profile || null,
+						letterhead: letterHead || null,
+						noLetterhead: letterHead ? "0" : "1",
+					});
+					return;
+				} catch (error) {
+					console.warn("QZ Tray KOT print failed", error);
+					if (confirmDocumentPrintFallback(error, { raw: useRawPrint })) {
+						silentPrint(url, printOptions);
+					}
+					return;
+				}
+			}
+
+			if (useRawPrint) {
+				const offlineError = new Error(__("Raw printing is not available while the POS is offline."));
+				if (confirmDocumentPrintFallback(offlineError, { raw: true, offline: true })) {
+					silentPrint(url, printOptions);
+				}
+				return;
+			}
+
+			if (useConfiguredQzPrint) {
+				silentPrint(url, printOptions);
+				return;
+			}
+
 			const printWindow = window.open(url, "Print");
 			if (printWindow) watchPrintWindow(printWindow, printOptions);
 		},
