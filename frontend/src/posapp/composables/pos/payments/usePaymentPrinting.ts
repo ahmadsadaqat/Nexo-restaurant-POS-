@@ -12,7 +12,7 @@ import {
 	shouldUseConfiguredQzDocumentPrinting,
 	shouldUseRawDocumentPrinting,
 } from "../../../services/documentPrint";
-import { printKotDocumentViaQz } from "../../../services/rawDocumentPrint";
+import { printKotDocumentViaQz, printRiderDispatchDocumentViaQz } from "../../../services/rawDocumentPrint";
 import { isOffline } from "../../../../offline/index";
 import { resolvePaymentPrintDoctype } from "../../../utils/paymentPrintDoctype";
 
@@ -113,6 +113,17 @@ export function usePaymentPrinting(options: PaymentPrintingOptions) {
 				profile,
 			}).catch((err) => {
 				console.error("KOT Print Error:", err);
+			});
+		}
+
+		if (profile?.posa_enable_rider_dispatch_printing && (doc?.posa_order_type === "Delivery" || doc?.custom_rider)) {
+			printRiderDispatchDocumentViaQz({
+				doctype,
+				name: docname,
+				doc,
+				profile,
+			}).catch((err) => {
+				console.error("Rider Dispatch Print Error:", err);
 			});
 		}
 

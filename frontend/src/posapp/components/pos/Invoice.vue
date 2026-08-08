@@ -315,7 +315,7 @@ import { getCurrentInstance, ref } from "vue";
 import { save_and_clear_invoice as saveAndClearInvoiceAction } from "./invoice_utils/actions";
 import { fetchDraftInvoices } from "../../utils/draftInvoices";
 import { getQuickCashTenderSuggestions } from "../../utils/cashTender";
-import { printKotDocumentViaQz } from "../../services/rawDocumentPrint";
+import { printKotDocumentViaQz, printRiderDispatchDocumentViaQz } from "../../services/rawDocumentPrint";
 
 // Composables
 import { useOnlineStatus } from "../../composables/core/useOnlineStatus";
@@ -1041,6 +1041,14 @@ export default {
 							doc: saved_invoice,
 							profile: this.pos_profile,
 						}).catch((err) => console.error("KOT Print Error:", err));
+					}
+					if (this.pos_profile?.posa_enable_rider_dispatch_printing && (this.invoiceStore.orderType === "Delivery" || saved_invoice?.custom_rider)) {
+						printRiderDispatchDocumentViaQz({
+							doctype: saved_invoice?.doctype || this.invoiceType || "POS Invoice",
+							name: saved_invoice?.name || "Draft",
+							doc: saved_invoice,
+							profile: this.pos_profile,
+						}).catch((err) => console.error("Rider Dispatch Print Error:", err));
 					}
 					this.toastStore.show({
 						message: this.__("KOT Created: ") + response.message.name,

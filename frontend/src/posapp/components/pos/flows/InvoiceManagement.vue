@@ -370,6 +370,16 @@
 											@click="openRiderDialog(item)"
 										/>
 										<v-btn
+											v-if="isDeliveryInvoice(item)"
+											icon="mdi-truck-delivery-outline"
+											variant="text"
+											size="small"
+											color="purple"
+											:title="__('Reprint Rider Dispatch')"
+											:aria-label="__('Reprint Rider Dispatch invoice')"
+											@click="printRiderDispatchInvoice(item)"
+										/>
+										<v-btn
 											icon="mdi-eye-outline"
 											variant="text"
 											size="small"
@@ -537,6 +547,16 @@
 											:title="invoice.custom_rider ? __('Update Rider') : __('Assign Rider')"
 											:aria-label="__('Assign rider to invoice')"
 											@click="openRiderDialog(invoice)"
+										/>
+										<v-btn
+											icon="mdi-truck-delivery-outline"
+											size="small"
+											variant="text"
+											v-if="isDeliveryInvoice(invoice)"
+											color="purple"
+											:title="__('Reprint Rider Dispatch')"
+											:aria-label="__('Reprint Rider Dispatch invoice')"
+											@click="printRiderDispatchInvoice(invoice)"
 										/>
 										<v-btn
 											icon="mdi-eye-outline"
@@ -1701,7 +1721,7 @@ import {
 	shouldUseConfiguredQzDocumentPrinting,
 	shouldUseRawDocumentPrinting,
 } from "../../../services/documentPrint";
-import { printKotDocumentViaQz } from "../../../services/rawDocumentPrint";
+import { printKotDocumentViaQz, printRiderDispatchDocumentViaQz } from "../../../services/rawDocumentPrint";
 import { isOffline, updateOfflineInvoiceRider, getOfflineInvoices } from "../../../../offline/index";
 import { buildInvoicePdfUrl, shouldDownloadPdfForShareError } from "../../../utils/invoiceSharing";
 import DocumentSourceSelector from "../shared/DocumentSourceSelector.vue";
@@ -3186,6 +3206,83 @@ export default {
 					return;
 				} catch (error) {
 					console.warn("QZ Tray KOT print failed", error);
+					if (confirmDocumentPrintFallback(error, { raw: useRawPrint })) {
+						silentPrint(url, printOptions);
+					}
+					return;
+				}
+			}
+
+			if (useRawPrint) {
+				const offlineError = new Error(__("Raw printing is not available while the POS is offline."));
+				if (confirmDocumentPrintFallback(offlineError, { raw: true, offline: true })) {
+					silentPrint(url, printOptions);
+				}
+				return;
+			}
+
+			if (useConfiguredQzPrint) {
+				silentPrint(url, printOptions);
+				return;
+			}
+
+			const printWindow = window.open(url, "Print");
+			if (printWindow) watchPrintWindow(printWindow, printOptions);
+		},
+		async printRiderDispatchInvoice(invoice) {
+			const profile = this.posProfile;
+			if (!invoice?.name || !profile) return;
+			const doctype = invoice.doctype || this.currentInvoiceDoctype;
+
+			if (profile.posa_enable_rider_dispatch_printing) {
+				try {
+					await printRiderDispatchDocumentViaQz({
+						doctype,
+						name: invoice.name,
+						doc: invoice,
+						profile,
+					});
+					return;
+				} catch (error) {
+					console.warn("Rider Dispatch QZ print failed", error);
+				}
+			}
+
+			const riderDispatchPrintFormat = profile.posa_rider_dispatch_print_format || profile.posa_kot_print_format || "Rider Dispatch";
+			const letterHead = profile.letter_head || 0;
+			const debugPrint = isDebugPrintEnabled();
+			const useConfiguredQzPrint = shouldUseConfiguredQzDocumentPrinting(profile);
+			const useRawPrint = shouldUseRawDocumentPrinting(profile);
+
+			let url =
+				frappe.urllib.get_base_url() +
+				"/printview?doctype=" +
+				encodeURIComponent(doctype) +
+				"&name=" +
+				encodeURIComponent(invoice.name) +
+				"&trigger_print=1&format=" +
+				encodeURIComponent(riderDispatchPrintFormat) +
+				"&no_letterhead=" +
+				(letterHead ? "0" : "1");
+			if (letterHead) url += "&letterhead=" + encodeURIComponent(letterHead);
+			url = appendDebugPrintParam(url, debugPrint);
+			const printOptions = { allowOfflineFallback: isOffline(), triggerPrint: "1", debugPrint };
+
+			if (useConfiguredQzPrint && !isOffline()) {
+				try {
+					await printDocumentViaConfiguredQz({
+						doctype,
+						name: invoice.name,
+						doc: invoice,
+						profile,
+						printFormat: riderDispatchPrintFormat,
+						printerName: profile.posa_rider_dispatch_printer_profile || profile.posa_kot_printer_profile || null,
+						letterhead: letterHead || null,
+						noLetterhead: letterHead ? "0" : "1",
+					});
+					return;
+				} catch (error) {
+					console.warn("QZ Tray Rider Dispatch print failed", error);
 					if (confirmDocumentPrintFallback(error, { raw: useRawPrint })) {
 						silentPrint(url, printOptions);
 					}

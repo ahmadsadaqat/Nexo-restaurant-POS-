@@ -3,7 +3,7 @@ import { get_invoice_doc, get_invoice_items, get_payments } from "./document";
 import { _logPriceListDebug, _buildPriceListSnapshot } from "./currency";
 import { applyReturnDiscountProration } from "./item_updates";
 import { prepareDocumentFlowAction } from "../../../utils/documentSources";
-import { printKotDocumentViaQz } from "../../../services/rawDocumentPrint";
+import { printKotDocumentViaQz, printRiderDispatchDocumentViaQz } from "../../../services/rawDocumentPrint";
 
 declare const __: (_text: string, _args?: any[]) => string;
 declare const frappe: any;
@@ -220,6 +220,17 @@ export async function save_and_clear_invoice(context: any) {
 				profile: context.pos_profile,
 			}).catch((err) => {
 				console.error("KOT Print Error:", err);
+			});
+		}
+
+		if (context.pos_profile?.posa_enable_rider_dispatch_printing && (old_invoice.posa_order_type === "Delivery" || context.invoiceStore?.orderType === "Delivery" || old_invoice.custom_rider)) {
+			printRiderDispatchDocumentViaQz({
+				doctype: old_invoice.doctype || context.invoiceType || "POS Invoice",
+				name: old_invoice.name || "Draft",
+				doc: old_invoice,
+				profile: context.pos_profile,
+			}).catch((err) => {
+				console.error("Rider Dispatch Print Error:", err);
 			});
 		}
 

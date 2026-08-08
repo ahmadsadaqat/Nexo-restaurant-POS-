@@ -10600,5 +10600,42 @@
   "translatable": 0,
   "unique": 0,
   "width": null
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Custom Field",
+  "name": "POS Profile-posa_enable_rider_dispatch_printing",
+  "dt": "POS Profile",
+  "fieldname": "posa_enable_rider_dispatch_printing",
+  "fieldtype": "Check",
+  "insert_after": "posa_kot_print_format",
+  "label": "Enable Rider Dispatch Printing",
+  "module": "POSAwesome"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Custom Field",
+  "name": "POS Profile-posa_rider_dispatch_printer_profile",
+  "dt": "POS Profile",
+  "fieldname": "posa_rider_dispatch_printer_profile",
+  "fieldtype": "Link",
+  "options": "POSA Printer Profile",
+  "insert_after": "posa_enable_rider_dispatch_printing",
+  "label": "Rider Dispatch Printer Profile",
+  "depends_on": "eval:doc.posa_enable_rider_dispatch_printing==1",
+  "module": "POSAwesome"
+ },
+ {
+  "docstatus": 0,
+  "doctype": "Custom Field",
+  "name": "POS Profile-posa_rider_dispatch_print_format",
+  "dt": "POS Profile",
+  "fieldname": "posa_rider_dispatch_print_format",
+  "fieldtype": "Link",
+  "options": "Print Format",
+  "insert_after": "posa_rider_dispatch_printer_profile",
+  "label": "Rider Dispatch Print Format",
+  "depends_on": "eval:doc.posa_enable_rider_dispatch_printing==1",
+  "module": "POSAwesome"
  }
 ]

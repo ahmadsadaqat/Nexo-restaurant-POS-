@@ -456,3 +456,46 @@ export async function printKotDocumentViaQz(options: RawDocumentPrintOptions) {
 	);
 	await sendRawToQz(rawData, kotPrinterProfileName);
 }
+
+export async function printRiderDispatchDocumentViaQz(options: RawDocumentPrintOptions) {
+	if (!options?.doctype || !options?.name) {
+		throw new Error(translate("Invalid raw print document details."));
+	}
+
+	if (!parseBooleanSetting(options.profile?.posa_enable_rider_dispatch_printing)) {
+		return;
+	}
+
+	const riderDispatchPrintFormat = options.profile?.posa_rider_dispatch_print_format;
+	const riderDispatchPrinterProfileName = options.profile?.posa_rider_dispatch_printer_profile;
+
+	if (riderDispatchPrintFormat) {
+		await printDocumentViaQz({
+			doctype: options.doctype,
+			name: options.name,
+			printFormat: riderDispatchPrintFormat,
+			printerName: riderDispatchPrinterProfileName,
+		});
+		return;
+	}
+
+	const doc = await loadDocument(options);
+	if (!doc) {
+		throw new Error(translate("Unable to load document for Rider Dispatch printing."));
+	}
+
+	if (!riderDispatchPrinterProfileName) {
+		console.warn(translate("Rider Dispatch Printer Profile is not configured in POS Profile."));
+		return;
+	}
+
+	const rawData = buildKotEscPosDocument(
+		{
+			...doc,
+			doctype: doc.doctype || options.doctype,
+			name: doc.name || options.name,
+		},
+		options,
+	);
+	await sendRawToQz(rawData, riderDispatchPrinterProfileName);
+}
