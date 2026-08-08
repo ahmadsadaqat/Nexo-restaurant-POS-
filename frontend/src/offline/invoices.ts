@@ -18,6 +18,7 @@ import {
 	getQueuedPayloadSnapshots,
 	markWriteQueueEntryFailed,
 	markWriteQueueEntrySynced,
+	updateQueuedPayloads,
 	type OfflineEntityType,
 } from "./writeQueue";
 
@@ -241,6 +242,42 @@ export async function clearOfflineInvoices() {
 
 export async function deleteOfflineInvoice(index: number) {
 	await deleteWriteQueueEntryByIndex(INVOICE_ENTITY, index);
+}
+
+export async function updateOfflineInvoiceRider(
+	invoiceIdentifier: string,
+	rider: string,
+	deliveryStatus?: string,
+) {
+	if (!invoiceIdentifier) {
+		return false;
+	}
+
+	const targetId = String(invoiceIdentifier).trim();
+	const status = String(deliveryStatus || (rider ? "Assigned" : "Not Assigned")).trim();
+
+	await updateQueuedPayloads(INVOICE_ENTITY, (payload: AnyRecord) => {
+		const inv = payload?.invoice;
+		if (!inv) {
+			return payload;
+		}
+
+		const match =
+			String(inv.name || "").trim() === targetId ||
+			String(inv.posa_client_request_id || "").trim() === targetId ||
+			String(payload.queue_id || "") === targetId;
+
+		if (match) {
+			inv.custom_rider = rider;
+			inv.custom_delivery_status = status;
+			payload.custom_rider = rider;
+			payload.custom_delivery_status = status;
+		}
+
+		return payload;
+	});
+
+	return true;
 }
 
 export function getPendingOfflineInvoiceCount() {

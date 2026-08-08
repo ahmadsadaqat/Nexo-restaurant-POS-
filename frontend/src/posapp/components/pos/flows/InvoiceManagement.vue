@@ -1683,7 +1683,7 @@ import {
 	shouldUseConfiguredQzDocumentPrinting,
 	shouldUseRawDocumentPrinting,
 } from "../../../services/documentPrint";
-import { isOffline } from "../../../../offline/index";
+import { isOffline, updateOfflineInvoiceRider } from "../../../../offline/index";
 import { buildInvoicePdfUrl, shouldDownloadPdfForShareError } from "../../../utils/invoiceSharing";
 import DocumentSourceSelector from "../shared/DocumentSourceSelector.vue";
 import {
@@ -2489,22 +2489,39 @@ export default {
 			this.selectedRider = invoice.custom_rider || "";
 			this.selectedDeliveryStatus = invoice.custom_delivery_status || "Not Assigned";
 			this.riderDialog = true;
-			// Load riders if not yet loaded
+			// Load riders from local cache first if available
 			if (!this.riderOptions.length) {
-				try {
-					const { message } = await frappe.call({
-						method: "frappe.client.get_list",
-						args: {
-							doctype: "Rider Profile",
-							fields: ["name"],
-							order_by: "name asc",
-							limit_page_length: 0,
-						},
-					});
-					this.riderOptions = Array.isArray(message) ? message : [];
-				} catch (e) {
-					console.error("Error loading riders:", e);
-					this.riderOptions = [];
+				const cached = localStorage.getItem("posa_cached_riders");
+				if (cached) {
+					try {
+						const parsed = JSON.parse(cached);
+						if (Array.isArray(parsed) && parsed.length) {
+							this.riderOptions = parsed;
+						}
+					} catch (e) {
+						console.error("Error parsing cached riders:", e);
+					}
+				}
+				if (!isOffline()) {
+					try {
+						const { message } = await frappe.call({
+							method: "frappe.client.get_list",
+							args: {
+								doctype: "Rider Profile",
+								fields: ["name"],
+								order_by: "name asc",
+								limit_page_length: 0,
+							},
+						});
+						if (Array.isArray(message)) {
+							this.riderOptions = message;
+							try {
+								localStorage.setItem("posa_cached_riders", JSON.stringify(message));
+							} catch (e) {}
+						}
+					} catch (e) {
+						console.error("Error loading riders from server:", e);
+					}
 				}
 			}
 		},
@@ -2512,19 +2529,41 @@ export default {
 			if (!this.riderDialogInvoice) return;
 			this.riderSaving = true;
 			try {
-				const doctype = this.riderDialogInvoice.doctype || this.currentInvoiceDoctype || "Sales Invoice";
-				await frappe.call({
-					method: "posawesome.posawesome.api.invoices.assign_rider",
-					args: {
-						doctype,
-						name: this.riderDialogInvoice.name,
-						rider: this.selectedRider || "",
-						delivery_status: this.selectedRider ? this.selectedDeliveryStatus : "Not Assigned",
-					},
-				});
-				this.toastStore.show({ title: __("Rider assigned and payment entry created successfully"), color: "success" });
-				this.riderDialog = false;
-				await this.refreshAll();
+				const invoice = this.riderDialogInvoice;
+				const rider = this.selectedRider || "";
+				const delivery_status = rider ? this.selectedDeliveryStatus : "Not Assigned";
+				const isOfflineInvoice =
+					invoice.is_offline ||
+					(typeof invoice.name === "string" && invoice.name.startsWith("Offline-")) ||
+					isOffline();
+
+				if (isOfflineInvoice) {
+					const identifier = invoice.posa_client_request_id || invoice.name;
+					await updateOfflineInvoiceRider(identifier, rider, delivery_status);
+					invoice.custom_rider = rider;
+					invoice.custom_delivery_status = delivery_status;
+					this.toastStore.show({
+						title: __("Rider assigned offline. Will sync when online."),
+						color: "success",
+					});
+					this.riderDialog = false;
+				} else {
+					const doctype = invoice.doctype || this.currentInvoiceDoctype || "Sales Invoice";
+					await frappe.call({
+						method: "posawesome.posawesome.api.invoices.assign_rider",
+						args: {
+							doctype,
+							name: invoice.name,
+							rider,
+							delivery_status,
+						},
+					});
+					invoice.custom_rider = rider;
+					invoice.custom_delivery_status = delivery_status;
+					this.toastStore.show({ title: __("Rider assigned and payment entry created successfully"), color: "success" });
+					this.riderDialog = false;
+					await this.refreshAll();
+				}
 			} catch (error) {
 				console.error("Error saving rider:", error);
 				this.toastStore.show({ title: __("Unable to assign rider"), color: "error" });
