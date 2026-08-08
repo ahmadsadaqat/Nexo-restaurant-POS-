@@ -1683,7 +1683,7 @@ import {
 	shouldUseConfiguredQzDocumentPrinting,
 	shouldUseRawDocumentPrinting,
 } from "../../../services/documentPrint";
-import { isOffline, updateOfflineInvoiceRider } from "../../../../offline/index";
+import { isOffline, updateOfflineInvoiceRider, getOfflineInvoices } from "../../../../offline/index";
 import { buildInvoicePdfUrl, shouldDownloadPdfForShareError } from "../../../utils/invoiceSharing";
 import DocumentSourceSelector from "../shared/DocumentSourceSelector.vue";
 import {
@@ -2769,9 +2769,42 @@ export default {
 			if (this.activeTab === "partial") return this.loadUnpaidInvoices();
 			return this.loadHistory();
 		},
+		getNormalizedOfflineInvoices() {
+			try {
+				const queueEntries = getOfflineInvoices() || [];
+				return queueEntries.map((entry) => {
+					const inv = entry?.invoice || entry;
+					return {
+						...inv,
+						name: inv.name || inv.posa_client_request_id || entry.queue_id || "Offline Invoice",
+						doctype: inv.doctype || this.currentInvoiceDoctype || "Sales Invoice",
+						customer: inv.customer || "Walk In",
+						customer_name: inv.customer_name || inv.customer || "Walk In",
+						posting_date: inv.posting_date || new Date().toISOString().slice(0, 10),
+						posting_time: inv.posting_time || new Date().toTimeString().slice(0, 8),
+						grand_total: Number(inv.grand_total ?? inv.rounded_total ?? 0),
+						paid_amount: Number(inv.paid_amount ?? 0),
+						outstanding_amount: Number(inv.outstanding_amount ?? 0),
+						status: inv.status || (Number(inv.outstanding_amount ?? 0) <= 0 ? "Paid" : "Unpaid"),
+						posa_order_type: inv.posa_order_type || "Delivery",
+						custom_rider: inv.custom_rider || "",
+						custom_delivery_status:
+							inv.custom_delivery_status || (inv.custom_rider ? "Assigned" : "Not Assigned"),
+						is_offline: true,
+						posa_client_request_id: inv.posa_client_request_id || entry.idempotency_key,
+					};
+				});
+			} catch (e) {
+				console.error("Error loading offline invoices for management view:", e);
+				return [];
+			}
+		},
 		async loadUnpaidInvoices() {
 			if (!this.posProfile?.name) return void (this.unpaidInvoices = []);
 			this.loading = true;
+			const offlineInvoices = this.getNormalizedOfflineInvoices().filter(
+				(inv) => Number(inv.outstanding_amount || 0) > 0,
+			);
 			try {
 				const filters = this.buildInvoiceFilters({
 					is_return: 0,
@@ -2787,12 +2820,16 @@ export default {
 						limit_page_length: 0,
 					},
 				});
-				this.unpaidInvoices = Array.isArray(message)
+				const serverInvoices = Array.isArray(message)
 					? message.map((entry) => ({ ...entry, doctype: this.currentInvoiceDoctype }))
 					: [];
+				this.unpaidInvoices = [...offlineInvoices, ...serverInvoices];
 			} catch (error) {
 				console.error("Error loading unpaid invoices:", error);
-				this.toastStore.show({ title: __("Unable to fetch unpaid invoices"), color: "error" });
+				this.unpaidInvoices = offlineInvoices;
+				if (!isOffline()) {
+					this.toastStore.show({ title: __("Unable to fetch unpaid invoices"), color: "error" });
+				}
 			} finally {
 				this.loading = false;
 			}
@@ -2806,6 +2843,7 @@ export default {
 				return;
 			}
 			this.loading = true;
+			const offlineInvoices = this.getNormalizedOfflineInvoices();
 			try {
 				const filters = this.buildInvoiceFilters();
 				const doctypes =
@@ -2833,13 +2871,17 @@ export default {
 						return Array.isArray(message) ? message.map((entry) => ({ ...entry, doctype })) : [];
 					}),
 				);
-				this.historyInvoices = results.flat();
+				const serverInvoices = results.flat();
+				this.historyInvoices = [...offlineInvoices, ...serverInvoices];
 				if (typeof this.refreshRepairCandidates === "function") {
 					await this.refreshRepairCandidates(this.historyInvoices);
 				}
 			} catch (error) {
 				console.error("Error loading invoice history:", error);
-				this.toastStore.show({ title: __("Unable to fetch invoice history"), color: "error" });
+				this.historyInvoices = offlineInvoices;
+				if (!isOffline()) {
+					this.toastStore.show({ title: __("Unable to fetch invoice history"), color: "error" });
+				}
 				this.repairCandidateInvoiceNames = [];
 				this.repairedChangeAllocationInvoiceNames = [];
 				this.repairCandidateScopeReady = false;
@@ -2880,6 +2922,11 @@ export default {
 			}
 		},
 		async viewInvoice(invoice) {
+			if (invoice?.is_offline || (typeof invoice?.name === "string" && invoice.name.startsWith("Offline-"))) {
+				this.selectedInvoiceDetail = invoice;
+				this.detailDialog = true;
+				return;
+			}
 			try {
 				const { message } = await frappe.call({
 					method: "frappe.client.get",
