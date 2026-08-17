@@ -18,16 +18,19 @@ describe("offline print fallback totals", () => {
 			name: "ACC-SINV-OFFLINE-1",
 			company: "Test Co",
 			customer: "Walk In",
+			posa_order_type: "Takeaway",
 			grand_total: 100,
 			change_amount: 20,
 			payments: [{ mode_of_payment: "Cash", amount: 120 }],
-			items: [],
+			items: [{ item_name: "Item A", qty: 1, rate: 100, amount: 100 }],
 			taxes: [],
 		});
 
-		expect(html).toContain("Change Amount");
-		expect(html).toContain("20");
-		expect(html).toContain("<td style=\"width:40%; text-align:right;\">100</td>");
+		expect(html).toContain("Kitchen 92");
+		expect(html).toContain("Cash Received :");
+		expect(html).toContain("100.00");
+		expect(html).toContain("Cash Refund :");
+		expect(html).toContain("20.00");
 	});
 
 	it("prints return paid amount as negative", async () => {
@@ -36,12 +39,14 @@ describe("offline print fallback totals", () => {
 			company: "Test Co",
 			customer: "Walk In",
 			is_return: 1,
+			posa_order_type: "Takeaway",
 			grand_total: -80,
 			payments: [{ mode_of_payment: "Cash", amount: -80 }],
 			items: [],
 			taxes: [],
 		});
 
-		expect(html).toContain("<td style=\"width:40%; text-align:right;\">-80</td>");
+		expect(html).toContain("Cash Received :");
+		expect(html).toContain("-80.00");
 	});
 });
