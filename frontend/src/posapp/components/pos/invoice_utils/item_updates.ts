@@ -12,9 +12,7 @@ function syncLineAmounts(context: any, item: any) {
 	const baseRate =
 		Number.parseFloat(String(item.base_rate ?? item.rate ?? 0)) || 0;
 	const fmt = (value: number) =>
-		context?.flt
-			? context.flt(value, context.currency_precision)
-			: value;
+		context?.flt ? context.flt(value, context.currency_precision) : value;
 
 	item.amount = fmt(qty * rate);
 	item.base_amount = fmt(qty * baseRate);
@@ -23,7 +21,9 @@ function syncLineAmounts(context: any, item: any) {
 function refreshInvoiceTotals(context: any) {
 	if (typeof context?.invoiceStore?.recalculateTotals === "function") {
 		context.invoiceStore.recalculateTotals();
-	} else if (typeof context?.invoiceStore?.triggerUpdateTotals === "function") {
+	} else if (
+		typeof context?.invoiceStore?.triggerUpdateTotals === "function"
+	) {
 		context.invoiceStore.triggerUpdateTotals();
 	}
 }
@@ -73,6 +73,12 @@ export async function update_items_details(context: any, items: any[]) {
 				item.allow_negative_stock = updated_item.allow_negative_stock;
 				item.batch_no_data = updated_item.batch_no_data;
 				item.serial_no_data = updated_item.serial_no_data;
+				if (updated_item.item_tax_template !== undefined) {
+					item.item_tax_template = updated_item.item_tax_template;
+				}
+				if (updated_item.item_tax_rate !== undefined) {
+					item.item_tax_rate = updated_item.item_tax_rate;
+				}
 
 				if (
 					item.has_batch_no &&
@@ -104,8 +110,7 @@ export async function update_items_details(context: any, items: any[]) {
 						updated_item.price_list_currency ||
 						item.price_list_currency ||
 						context.selected_currency;
-					const manualLocked =
-						item._manual_rate_set === true;
+					const manualLocked = item._manual_rate_set === true;
 					const shouldOverrideRate =
 						!lockReturnPricing &&
 						!item.locked_price &&
@@ -286,7 +291,8 @@ export function _applyItemDetailPayload(
 	const lockReturnPricing = Boolean(
 		currentDoc?.is_return && currentDoc?.return_against,
 	);
-	const preserveLockedPrice = item?.locked_price === true || lockReturnPricing;
+	const preserveLockedPrice =
+		item?.locked_price === true || lockReturnPricing;
 
 	if (!item.warehouse) {
 		item.warehouse = context.pos_profile.warehouse;
@@ -329,6 +335,7 @@ export function _applyItemDetailPayload(
 			data.locked_price === "1";
 	item.description = data.description;
 	item.item_tax_template = data.item_tax_template;
+	item.item_tax_rate = data.item_tax_rate || item.item_tax_rate || null;
 	if (!lockReturnPricing) {
 		item.discount_percentage = data.discount_percentage;
 	}
@@ -380,7 +387,10 @@ export function _applyItemDetailPayload(
 	if (data.serial_no_data) item.serial_no_data = data.serial_no_data;
 	if (data.batch_no_data) item.batch_no_data = data.batch_no_data;
 
-	if (Array.isArray(item.serial_no_selected) && item.serial_no_selected.length) {
+	if (
+		Array.isArray(item.serial_no_selected) &&
+		item.serial_no_selected.length
+	) {
 		// Preserve explicit serial selections even when server response omits `serial_no`.
 		item.serial_no = item.serial_no_selected.join("\n");
 		item.serial_no_selected_count = item.serial_no_selected.length;
@@ -447,7 +457,10 @@ export function _applyItemDetailPayload(
 		if (Number.isFinite(basePriceListRate) && basePriceListRate > 0) {
 			const baseDiscountAmount =
 				(basePriceListRate * incomingDiscountPct) / 100;
-			const baseRate = Math.max(basePriceListRate - baseDiscountAmount, 0);
+			const baseRate = Math.max(
+				basePriceListRate - baseDiscountAmount,
+				0,
+			);
 			const toDisplay = (value: number) =>
 				typeof context._fromBaseCurrency === "function"
 					? context._fromBaseCurrency(value)
@@ -597,8 +610,8 @@ export function _doesManualOverrideMatchItem(
 			Boolean(
 				(typeof item.auto_free_source === "string" &&
 					item.auto_free_source) ||
-				(typeof item.free_item_source === "string" &&
-					item.free_item_source),
+					(typeof item.free_item_source === "string" &&
+						item.free_item_source),
 			);
 
 		if (expectsFree !== itemIsFree) return false;
@@ -609,7 +622,7 @@ export function _doesManualOverrideMatchItem(
 			typeof item.auto_free_source === "string" && item.auto_free_source
 				? item.auto_free_source
 				: typeof item.free_item_source === "string" &&
-					item.free_item_source
+					  item.free_item_source
 					? item.free_item_source
 					: null;
 		if (itemSource && itemSource !== auto_free_source) return false;
@@ -734,8 +747,8 @@ export function _buildManualOverrideKeyFromItem(context: any, item: any) {
 
 	const idx =
 		item.idx !== undefined &&
-			item.idx !== null &&
-			!Number.isNaN(Number(item.idx))
+		item.idx !== null &&
+		!Number.isNaN(Number(item.idx))
 			? Number(item.idx)
 			: null;
 
@@ -856,9 +869,9 @@ export function _restoreManualSnapshots(
 			) {
 				item.amount = context.flt
 					? context.flt(
-						item.qty * item.rate,
-						context.currency_precision,
-					)
+							item.qty * item.rate,
+							context.currency_precision,
+						)
 					: item.qty * item.rate;
 			}
 
@@ -870,9 +883,9 @@ export function _restoreManualSnapshots(
 			) {
 				item.base_amount = context.flt
 					? context.flt(
-						item.qty * item.base_rate,
-						context.currency_precision,
-					)
+							item.qty * item.base_rate,
+							context.currency_precision,
+						)
 					: item.qty * item.base_rate;
 			}
 		}

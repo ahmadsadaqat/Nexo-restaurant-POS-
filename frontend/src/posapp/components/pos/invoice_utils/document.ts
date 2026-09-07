@@ -16,7 +16,9 @@ function normalizeBackendDate(context: any, value: any): string | null {
 	}
 
 	const candidate =
-		value && typeof value === "object" && "value" in value ? value.value : value;
+		value && typeof value === "object" && "value" in value
+			? value.value
+			: value;
 	if (!candidate) {
 		return null;
 	}
@@ -76,7 +78,8 @@ function clearStalePartyFieldsForCustomerChange(
 	}
 
 	const nextValues: Record<string, any> = {
-		customer_name: customerDetails?.customer_name || doc.customer_name || null,
+		customer_name:
+			customerDetails?.customer_name || doc.customer_name || null,
 		customer_address: customerDetails?.customer_address || null,
 		shipping_address_name: customerDetails?.shipping_address || null,
 		contact_person: customerDetails?.contact_person || null,
@@ -96,10 +99,12 @@ function clearStalePartyFieldsForCustomerChange(
 	];
 
 	customerDependentFields.forEach((fieldname) => {
-		const nextValue =
-			Object.prototype.hasOwnProperty.call(nextValues, fieldname)
-				? nextValues[fieldname]
-				: undefined;
+		const nextValue = Object.prototype.hasOwnProperty.call(
+			nextValues,
+			fieldname,
+		)
+			? nextValues[fieldname]
+			: undefined;
 		if (nextValue !== undefined && nextValue !== null && nextValue !== "") {
 			doc[fieldname] = nextValue;
 			return;
@@ -176,8 +181,7 @@ export function get_invoice_doc(context: any) {
 				? 0
 				: 1;
 		const isOrderInvoiceFlow =
-			context.invoiceType === "Order" &&
-			doc.doctype !== "Sales Order";
+			context.invoiceType === "Order" && doc.doctype !== "Sales Order";
 		doc.update_stock =
 			explicitFlowUpdateStock === 0 || explicitFlowUpdateStock === 1
 				? explicitFlowUpdateStock
@@ -217,11 +221,15 @@ export function get_invoice_doc(context: any) {
 		customerDetails.customer === resolvedCustomer
 			? customerDetails
 			: {};
-	const customerChanged =
-		Boolean(previousCustomer && resolvedCustomer && previousCustomer !== resolvedCustomer);
+	const customerChanged = Boolean(
+		previousCustomer &&
+			resolvedCustomer &&
+			previousCustomer !== resolvedCustomer,
+	);
 	doc.customer = resolvedCustomer;
 	if (customerChanged) {
-		doc.customer_name = matchingCustomerDetails.customer_name || resolvedCustomer;
+		doc.customer_name =
+			matchingCustomerDetails.customer_name || resolvedCustomer;
 	}
 	if (!doc.customer_name && matchingCustomerDetails.customer_name) {
 		doc.customer_name = matchingCustomerDetails.customer_name;
@@ -313,7 +321,9 @@ export function get_invoice_doc(context: any) {
 				bestMop = mop;
 			}
 		});
-		resolvedTmplName = bestMop ? mappings[bestMop] : context.pos_profile.taxes_and_charges;
+		resolvedTmplName = bestMop
+			? mappings[bestMop]
+			: context.pos_profile.taxes_and_charges;
 		if (resolvedTmplName) {
 			hasPaymentTaxes = true;
 		}
@@ -334,27 +344,96 @@ export function get_invoice_doc(context: any) {
 				included_in_print_rate: tax.included_in_print_rate || 0,
 				tax_amount: tax.tax_amount,
 				total: tax.total,
-				base_tax_amount:
-					toCompanyCurrency(context, tax.tax_amount),
+				base_tax_amount: toCompanyCurrency(context, tax.tax_amount),
 				base_total: toCompanyCurrency(context, tax.total),
 			});
 		});
 		doc.total_taxes_and_charges = totalTax;
 	} else if (hasPaymentTaxes || isOffline()) {
-		const templateName = resolvedTmplName || context.pos_profile.taxes_and_charges;
+		const templateName =
+			resolvedTmplName || context.pos_profile.taxes_and_charges;
 		const tmpl = getTaxTemplate(templateName);
 		if (tmpl && Array.isArray(tmpl.taxes)) {
 			const inclusive = getTaxInclusiveSetting();
 			let runningTotal = grandTotal;
 			let totalTax = 0;
-			tmpl.taxes.forEach((row) => {
+
+			// Build combined tax rows: payment tax template rows + any item-specific tax accounts
+			const taxRows: any[] = [...tmpl.taxes];
+			const seenAccounts = new Set(
+				taxRows.map((r) => r.account_head).filter(Boolean),
+			);
+
+			(doc.items || []).forEach((item: any) => {
+				if (item.item_tax_template && item.item_tax_rate) {
+					let itemMap: Record<string, number> = {};
+					try {
+						itemMap =
+							typeof item.item_tax_rate === "string"
+								? JSON.parse(item.item_tax_rate)
+								: item.item_tax_rate;
+					} catch {
+						itemMap = {};
+					}
+					Object.keys(itemMap || {}).forEach((acc) => {
+						if (acc && !seenAccounts.has(acc)) {
+							seenAccounts.add(acc);
+							taxRows.push({
+								account_head: acc,
+								charge_type: "On Net Total",
+								description: acc.split(" - ")[0],
+								rate: 0,
+								included_in_print_rate: inclusive ? 1 : 0,
+							});
+						}
+					});
+				}
+			});
+
+			taxRows.forEach((row) => {
 				let tax_amount = 0;
 				if (row.charge_type === "Actual") {
 					tax_amount = flt(row.tax_amount || 0);
-				} else if (inclusive) {
-					tax_amount = flt((doc.total * flt(row.rate)) / 100);
 				} else {
-					tax_amount = flt((doc.net_total * flt(row.rate)) / 100);
+					(doc.items || []).forEach((item: any) => {
+						let itemRate = flt(row.rate);
+						if (item.item_tax_template) {
+							let itemMap: Record<string, number> = {};
+							if (item.item_tax_rate) {
+								try {
+									itemMap =
+										typeof item.item_tax_rate === "string"
+											? JSON.parse(item.item_tax_rate)
+											: item.item_tax_rate;
+								} catch {
+									itemMap = {};
+								}
+							}
+							if (
+								row.account_head &&
+								row.account_head in itemMap
+							) {
+								itemRate = flt(itemMap[row.account_head]);
+							} else {
+								itemRate = 0;
+							}
+						}
+						const itemQty = flt(item.qty);
+						const itemPrice = flt(item.rate);
+						const itemNet = flt(
+							item.net_amount ?? itemQty * itemPrice,
+						);
+						const itemGross = flt(
+							item.amount ?? itemQty * itemPrice,
+						);
+						if (inclusive) {
+							tax_amount += flt(
+								(itemGross * itemRate) / (100 + itemRate),
+							);
+						} else {
+							tax_amount += flt((itemNet * itemRate) / 100);
+						}
+					});
 				}
 				if (!inclusive) {
 					runningTotal += tax_amount;
@@ -369,15 +448,13 @@ export function get_invoice_doc(context: any) {
 						row.charge_type === "Actual" ? 0 : inclusive ? 1 : 0,
 					tax_amount: tax_amount,
 					total: runningTotal,
-					base_tax_amount:
-						toCompanyCurrency(context, tax_amount),
+					base_tax_amount: toCompanyCurrency(context, tax_amount),
 					base_total: toCompanyCurrency(context, runningTotal),
 				});
 			});
 			if (inclusive) {
 				doc.net_total = doc.total - totalTax;
-				doc.base_net_total =
-					toCompanyCurrency(context, doc.net_total);
+				doc.base_net_total = toCompanyCurrency(context, doc.net_total);
 				grandTotal = doc.total;
 			} else {
 				grandTotal = runningTotal;
@@ -511,7 +588,10 @@ export function get_invoice_doc(context: any) {
 		doc.payments.forEach((payment) => {
 			if (context.selected_currency !== companyCurrency) {
 				// Convert payment amount to base currency
-				payment.base_amount = toCompanyCurrency(context, payment.amount);
+				payment.base_amount = toCompanyCurrency(
+					context,
+					payment.amount,
+				);
 			} else {
 				payment.base_amount = payment.amount;
 			}
@@ -601,6 +681,12 @@ export function get_invoice_items(context: any) {
 			batch_no: item.batch_no,
 			posa_notes: item.posa_notes,
 			posa_delivery_date: itemDeliveryDate,
+			item_tax_template: item.item_tax_template || null,
+			item_tax_rate: item.item_tax_rate
+				? typeof item.item_tax_rate === "string"
+					? item.item_tax_rate
+					: JSON.stringify(item.item_tax_rate)
+				: null,
 		};
 
 		if (requiresDeliveryDate && itemDeliveryDate) {
@@ -615,8 +701,7 @@ export function get_invoice_items(context: any) {
 
 			// Use pre-stored base_rate if available, otherwise calculate
 			new_item.base_rate =
-				item.base_rate ||
-				toCompanyCurrency(context, item.rate);
+				item.base_rate || toCompanyCurrency(context, item.rate);
 
 			new_item.price_list_rate = flt(item.price_list_rate); // Keep price list rate in USD
 			new_item.base_price_list_rate =
@@ -625,8 +710,7 @@ export function get_invoice_items(context: any) {
 
 			// Calculate amounts
 			new_item.amount = flt(item.qty) * new_item.rate; // Amount in USD
-			new_item.base_amount =
-				toCompanyCurrency(context, new_item.amount);
+			new_item.base_amount = toCompanyCurrency(context, new_item.amount);
 
 			// Handle discount amount
 			new_item.discount_amount = flt(item.discount_amount); // Keep discount in USD
@@ -685,6 +769,12 @@ export function get_order_items(context: any) {
 			amount: flt(item.qty) * flt(item.rate),
 			conversion_factor: item.conversion_factor,
 			serial_no: item.serial_no,
+			item_tax_template: item.item_tax_template || null,
+			item_tax_rate: item.item_tax_rate
+				? typeof item.item_tax_rate === "string"
+					? item.item_tax_rate
+					: JSON.stringify(item.item_tax_rate)
+				: null,
 			discount_percentage: flt(item.discount_percentage),
 			discount_amount: flt(item.discount_amount),
 			batch_no: item.batch_no,

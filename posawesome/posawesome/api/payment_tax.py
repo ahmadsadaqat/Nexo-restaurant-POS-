@@ -76,19 +76,81 @@ def resolve_tax_template_for_payments(pos_profile, payments):
     return None
 
 
+def sync_item_tax_template_rates(invoice_doc):
+    """Ensure items with Item Tax Template ignore payment/invoice tax rates,
+    and their specific tax accounts are present in invoice_doc.taxes table.
+    """
+    if not invoice_doc.get("items"):
+        return
+
+    from erpnext.stock.get_item_details import get_item_tax_template, get_item_tax_map
+
+    # 1. Resolve item_tax_template for items that have it in Item master but not set on row
+    for item in invoice_doc.items:
+        if not item.get("item_tax_template") and item.get("item_code"):
+            tmpl = get_item_tax_template({
+                "company": invoice_doc.company,
+                "item_code": item.item_code,
+                "tax_category": invoice_doc.get("tax_category"),
+                "posting_date": invoice_doc.get("posting_date"),
+                "bill_date": invoice_doc.get("bill_date"),
+                "transaction_date": invoice_doc.get("transaction_date"),
+            })
+            if tmpl:
+                item.item_tax_template = tmpl
+
+    has_item_templates = any(item.get("item_tax_template") for item in invoice_doc.items)
+    if not has_item_templates:
+        return
+
+    # 2. Ensure accounts from Item Tax Template Detail exist in taxes table
+    existing_accounts = {t.account_head for t in invoice_doc.taxes if t.account_head}
+    for item in invoice_doc.items:
+        if item.get("item_tax_template"):
+            item_details = frappe.get_all(
+                "Item Tax Template Detail",
+                filters={"parent": item.item_tax_template},
+                fields=["tax_type", "tax_rate"],
+            )
+            for d in item_details:
+                if d.tax_type and d.tax_type not in existing_accounts:
+                    tax_row = invoice_doc.append("taxes", {})
+                    tax_row.update(
+                        {
+                            "charge_type": "On Net Total",
+                            "account_head": d.tax_type,
+                            "description": str(d.tax_type).split(" - ")[0],
+                            "rate": 0,
+                            "cost_center": invoice_doc.get("cost_center"),
+                        }
+                    )
+                    existing_accounts.add(d.tax_type)
+
+    # 3. For items with item_tax_template, ensure any tax account in invoice_doc.taxes
+    # that is NOT in the item's tax template is set to 0.0 in item.item_tax_rate
+    for item in invoice_doc.items:
+        if item.get("item_tax_template"):
+            item_map = get_item_tax_map(invoice_doc.company, item.item_tax_template, as_json=False) or {}
+            for tax in invoice_doc.taxes:
+                if tax.account_head and tax.account_head not in item_map:
+                    item_map[tax.account_head] = 0.0
+            item.item_tax_rate = frappe.as_json(item_map)
+
+
 def apply_payment_tax_template(invoice_doc, payments=None):
     """Apply the correct tax template based on payment methods on the invoice.
 
     This replaces the invoice's taxes child table with rows from the
     resolved template. If no payment-specific template matches, the
     invoice taxes are left unchanged (using the default POS Profile template).
+    Items with their own Item Tax Template will ignore payment tax template rates.
 
     Args:
         invoice_doc: The Sales/POS Invoice document object.
         payments: Optional list of payment rows. If None, uses invoice_doc.payments.
 
     Returns:
-        bool: True if the tax template was changed, False otherwise.
+        bool: True if the tax template was changed or applied, False otherwise.
     """
     if not invoice_doc.pos_profile:
         return False
@@ -98,48 +160,52 @@ def apply_payment_tax_template(invoice_doc, payments=None):
 
     template_name = resolve_tax_template_for_payments(invoice_doc.pos_profile, payments)
     if not template_name:
+        sync_item_tax_template_rates(invoice_doc)
         return False
 
     # Check if the template is already applied
     current_template = invoice_doc.get("taxes_and_charges")
-    if current_template == template_name:
-        return False
+    template_changed = current_template != template_name
 
-    # Fetch the template and apply its tax rows
-    try:
-        template_doc = frappe.get_cached_doc("Sales Taxes and Charges Template", template_name)
-    except frappe.DoesNotExistError:
-        frappe.log_error(
-            f"Tax template '{template_name}' configured in POS Profile "
-            f"'{invoice_doc.pos_profile}' does not exist.",
-            "POS Payment Tax Template Error",
-        )
-        return False
+    if template_changed:
+        # Fetch the template and apply its tax rows
+        try:
+            template_doc = frappe.get_cached_doc("Sales Taxes and Charges Template", template_name)
+        except frappe.DoesNotExistError:
+            frappe.log_error(
+                f"Tax template '{template_name}' configured in POS Profile "
+                f"'{invoice_doc.pos_profile}' does not exist.",
+                "POS Payment Tax Template Error",
+            )
+            return False
 
-    # Clear existing taxes and apply from template
-    invoice_doc.set("taxes", [])
-    invoice_doc.taxes_and_charges = template_name
+        # Clear existing taxes and apply from template
+        invoice_doc.set("taxes", [])
+        invoice_doc.taxes_and_charges = template_name
 
-    for row in template_doc.taxes:
-        tax_row = invoice_doc.append("taxes", {})
-        tax_row.update(
-            {
-                "charge_type": row.charge_type,
-                "account_head": row.account_head,
-                "description": row.description,
-                "rate": row.rate,
-                "tax_amount": row.tax_amount if row.charge_type == "Actual" else 0,
-                "cost_center": row.cost_center,
-                "included_in_print_rate": row.included_in_print_rate,
-                "included_in_paid_amount": row.get("included_in_paid_amount") or 0,
-            }
-        )
+        for row in template_doc.taxes:
+            tax_row = invoice_doc.append("taxes", {})
+            tax_row.update(
+                {
+                    "charge_type": row.charge_type,
+                    "account_head": row.account_head,
+                    "description": row.description,
+                    "rate": row.rate,
+                    "tax_amount": row.tax_amount if row.charge_type == "Actual" else 0,
+                    "cost_center": row.cost_center,
+                    "included_in_print_rate": row.included_in_print_rate,
+                    "included_in_paid_amount": row.get("included_in_paid_amount") or 0,
+                }
+            )
+
+    sync_item_tax_template_rates(invoice_doc)
 
     # Recalculate taxes and totals
     if hasattr(invoice_doc, "calculate_taxes_and_totals"):
         invoice_doc.calculate_taxes_and_totals()
 
-    return True
+    return template_changed
+
 
 
 @frappe.whitelist()

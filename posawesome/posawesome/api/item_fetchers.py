@@ -179,6 +179,7 @@ def _fetch_item_meta(item_codes: Tuple[str, ...]):
         "allow_negative_stock",
         "purchase_uom",
         "standard_rate",
+        "item_group",
     ]
     if frappe.db.has_column("Item", "default_bom"):
         fields.append("default_bom")
@@ -234,6 +235,62 @@ def get_uoms(item_codes: Sequence[str], ttl: Optional[int] = None):
 
     cached = _cache_wrapper(_uom_cache, ttl, _fetch_uoms)
     return cached(tuple(item_codes))
+
+
+def _fetch_item_taxes(
+    item_codes: Tuple[str, ...], company: Optional[str] = None
+) -> Tuple[Dict[str, str], Dict[str, Dict[str, float]]]:
+    """Return item tax templates and tax rates mapped by item code."""
+    if not item_codes:
+        return {}, {}
+
+    company = company or frappe.defaults.get_user_default("Company")
+    today = nowdate()
+
+    item_taxes = frappe.db.sql(
+        """
+        SELECT parent as item_code, item_tax_template, valid_from
+        FROM `tabItem Tax`
+        WHERE parent IN %(item_codes)s
+          AND (valid_from IS NULL OR valid_from <= %(today)s)
+        ORDER BY valid_from DESC
+        """,
+        {"item_codes": item_codes, "today": today},
+        as_dict=True,
+    )
+
+    tax_template_map: Dict[str, str] = {}
+    templates_to_fetch = set()
+    for row in item_taxes:
+        if row.item_code not in tax_template_map and row.item_tax_template:
+            if company:
+                tmpl_company = frappe.db.get_value(
+                    "Item Tax Template", row.item_tax_template, "company"
+                )
+                if tmpl_company and tmpl_company != company:
+                    continue
+            tax_template_map[row.item_code] = row.item_tax_template
+            templates_to_fetch.add(row.item_tax_template)
+
+    tax_rate_map: Dict[str, Dict[str, float]] = {}
+    if templates_to_fetch:
+        details = frappe.db.sql(
+            """
+            SELECT parent, tax_type, tax_rate
+            FROM `tabItem Tax Template Detail`
+            WHERE parent IN %(templates)s
+            """,
+            {"templates": list(templates_to_fetch)},
+            as_dict=True,
+        )
+        template_rates: Dict[str, Dict[str, float]] = {}
+        for d in details:
+            template_rates.setdefault(d.parent, {})[d.tax_type] = flt(d.tax_rate)
+
+        for item_code, tmpl_name in tax_template_map.items():
+            tax_rate_map[item_code] = template_rates.get(tmpl_name, {})
+
+    return tax_template_map, tax_rate_map
 
 
 def _normalize_warehouses(warehouse: Optional[str]) -> Tuple[str, ...]:
@@ -477,6 +534,8 @@ class ItemLookupData:
     batch_map: Dict[str, List[Dict[str, Any]]]
     serial_map: Dict[str, List[Dict[str, Any]]]
     bom_map: Dict[str, Dict[str, Any]]
+    tax_template_map: Optional[Dict[str, str]] = None
+    tax_rate_map: Optional[Dict[str, Dict[str, float]]] = None
 
 
 def _select_price(
@@ -557,6 +616,8 @@ def merge_item_row(
             "price_list_currency": price_list_currency,
             "plc_conversion_rate": exchange_rate,
             "conversion_rate": exchange_rate,
+            "item_tax_template": lookup_data.tax_template_map.get(item_code) if lookup_data.tax_template_map else None,
+            "item_tax_rate": lookup_data.tax_rate_map.get(item_code, {}) if lookup_data.tax_rate_map else {},
         }
     )
     bom_cost = lookup_data.bom_map.get(item_code)
@@ -644,7 +705,7 @@ class ItemDetailAggregator:
 
         item_codes_tuple = _normalize_codes(item_codes)
         if not item_codes_tuple:
-            return ItemLookupData({}, {}, {}, {}, {}, {}, {}, {})
+            return ItemLookupData({}, {}, {}, {}, {}, {}, {}, {}, {}, {})
 
         use_cache = bool(self.pos_profile.get("posa_use_server_cache"))
 
@@ -742,6 +803,10 @@ class ItemDetailAggregator:
                 {"serial_no": row.serial_no, "batch_no": row.batch_no}
             )
 
+        tax_template_map, tax_rate_map = _fetch_item_taxes(
+            item_codes_tuple, company=self.pos_profile.get("company")
+        )
+
         return ItemLookupData(
             price_map=price_map,
             stock_map=stock_map,
@@ -751,6 +816,8 @@ class ItemDetailAggregator:
             batch_map=batch_map,
             serial_map=serial_map,
             bom_map=bom_map,
+            tax_template_map=tax_template_map,
+            tax_rate_map=tax_rate_map,
         )
 
     def build_details(self, items_data: Sequence[Dict[str, object]]) -> List[Dict[str, object]]:

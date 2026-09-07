@@ -718,9 +718,7 @@ const visiblePaymentMethods = computed(() =>
 	),
 );
 
-const creditSaleAllowed = computed(() =>
-	parseBooleanSetting(pos_profile.value?.posa_allow_credit_sale),
-);
+const creditSaleAllowed = computed(() => parseBooleanSetting(pos_profile.value?.posa_allow_credit_sale));
 
 const giftCardAppliedAmount = computed(() =>
 	(Array.isArray(giftCardRedemptions.value) ? giftCardRedemptions.value : []).reduce(
@@ -1744,7 +1742,7 @@ const handlePaymentShortcut = (event) => {
 		return;
 	}
 
-	if ((event.ctrlKey || event.metaKey) && ['1', '2', '3', '4'].includes(key)) {
+	if ((event.ctrlKey || event.metaKey) && ["1", "2", "3", "4"].includes(key)) {
 		event.preventDefault();
 		event.stopPropagation();
 		const index = parseInt(key) - 1;
@@ -1764,11 +1762,7 @@ const handleSubmitPaymentShortcut = ({ print = false, amount = null } = {}) => {
 
 	if (amount !== null) {
 		const shortcutAmount = Number(amount);
-		if (
-			!invoice_doc.value?.is_return &&
-			Number.isFinite(shortcutAmount) &&
-			shortcutAmount === 0
-		) {
+		if (!invoice_doc.value?.is_return && Number.isFinite(shortcutAmount) && shortcutAmount === 0) {
 			if (!enableShortcutCreditSale()) {
 				return;
 			}
@@ -1852,6 +1846,7 @@ const recalculateTaxesForPayments = (preferredMop = null) => {
 
 	const expectedTaxCount = Array.isArray(tmpl.taxes) ? tmpl.taxes.length : 0;
 	if (
+		!preferredMop &&
 		invoice_doc.value.taxes_and_charges === targetTemplate &&
 		(invoice_doc.value.taxes?.length || 0) === expectedTaxCount
 	) {
@@ -1875,33 +1870,87 @@ const recalculateTaxesForPayments = (preferredMop = null) => {
 	let runningTotal = grandTotal;
 	let totalTax = 0;
 
-	if (Array.isArray(tmpl.taxes)) {
-		tmpl.taxes.forEach((row) => {
-			let tax_amount = 0;
-			if (row.charge_type === "Actual") {
-				tax_amount = flt(row.tax_amount || 0);
-			} else if (inclusive) {
-				tax_amount = flt((invoice_doc.value.total * flt(row.rate)) / 100);
-			} else {
-				tax_amount = flt((invoice_doc.value.net_total * flt(row.rate)) / 100);
+	const taxRows = [...(tmpl.taxes || [])];
+	const seenAccounts = new Set(taxRows.map((r) => r.account_head).filter(Boolean));
+
+	(invoice_doc.value.items || []).forEach((item) => {
+		if (item.item_tax_template && item.item_tax_rate) {
+			let itemMap = {};
+			try {
+				itemMap =
+					typeof item.item_tax_rate === "string"
+						? JSON.parse(item.item_tax_rate)
+						: item.item_tax_rate;
+			} catch {
+				itemMap = {};
 			}
-			if (!inclusive) {
-				runningTotal += tax_amount;
-			}
-			totalTax += tax_amount;
-			invoice_doc.value.taxes.push({
-				account_head: row.account_head,
-				charge_type: row.charge_type || "On Net Total",
-				description: row.description,
-				rate: row.rate,
-				included_in_print_rate: row.charge_type === "Actual" ? 0 : inclusive ? 1 : 0,
-				tax_amount: tax_amount,
-				total: runningTotal,
-				base_tax_amount: toCompanyCurrency(context, tax_amount),
-				base_total: toCompanyCurrency(context, runningTotal),
+			Object.keys(itemMap || {}).forEach((acc) => {
+				if (acc && !seenAccounts.has(acc)) {
+					seenAccounts.add(acc);
+					taxRows.push({
+						account_head: acc,
+						charge_type: "On Net Total",
+						description: acc.split(" - ")[0],
+						rate: 0,
+						included_in_print_rate: inclusive ? 1 : 0,
+					});
+				}
 			});
+		}
+	});
+
+	taxRows.forEach((row) => {
+		let tax_amount = 0;
+		if (row.charge_type === "Actual") {
+			tax_amount = flt(row.tax_amount || 0);
+		} else {
+			(invoice_doc.value.items || []).forEach((item) => {
+				let itemRate = flt(row.rate);
+				if (item.item_tax_template) {
+					let itemMap = {};
+					if (item.item_tax_rate) {
+						try {
+							itemMap =
+								typeof item.item_tax_rate === "string"
+									? JSON.parse(item.item_tax_rate)
+									: item.item_tax_rate;
+						} catch {
+							itemMap = {};
+						}
+					}
+					if (row.account_head && row.account_head in itemMap) {
+						itemRate = flt(itemMap[row.account_head]);
+					} else {
+						itemRate = 0;
+					}
+				}
+				const itemQty = flt(item.qty);
+				const itemPrice = flt(item.rate);
+				const itemNet = flt(item.net_amount ?? itemQty * itemPrice);
+				const itemGross = flt(item.amount ?? itemQty * itemPrice);
+				if (inclusive) {
+					tax_amount += flt((itemGross * itemRate) / (100 + itemRate));
+				} else {
+					tax_amount += flt((itemNet * itemRate) / 100);
+				}
+			});
+		}
+		if (!inclusive) {
+			runningTotal += tax_amount;
+		}
+		totalTax += tax_amount;
+		invoice_doc.value.taxes.push({
+			account_head: row.account_head,
+			charge_type: row.charge_type || "On Net Total",
+			description: row.description,
+			rate: row.rate,
+			included_in_print_rate: row.charge_type === "Actual" ? 0 : inclusive ? 1 : 0,
+			tax_amount: tax_amount,
+			total: runningTotal,
+			base_tax_amount: toCompanyCurrency(context, tax_amount),
+			base_total: toCompanyCurrency(context, runningTotal),
 		});
-	}
+	});
 
 	if (inclusive) {
 		invoice_doc.value.net_total = invoice_doc.value.total - totalTax;
@@ -1954,7 +2003,7 @@ watch(
 	() => {
 		recalculateTaxesForPayments();
 	},
-	{ deep: true }
+	{ deep: true },
 );
 watch(
 	() => uiStore.posProfile,

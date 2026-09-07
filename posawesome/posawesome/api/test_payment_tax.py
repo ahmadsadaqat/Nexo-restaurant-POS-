@@ -10,7 +10,7 @@ from posawesome.posawesome.api.payment_tax import resolve_tax_template_for_payme
 class TestPaymentTaxResolution(FrappeTestCase):
     def setUp(self):
         super(TestPaymentTaxResolution, self).setUp()
-        
+
         # Get or create company
         company = frappe.db.get_single_value("Global Defaults", "default_company")
         if not company:
@@ -69,7 +69,7 @@ class TestPaymentTaxResolution(FrappeTestCase):
                     "default_account": self.account
                 })
                 mop.save(ignore_permissions=True)
-            
+
         if not frappe.db.exists("Mode of Payment", "Card Payment Test"):
             mop = frappe.new_doc("Mode of Payment")
             mop.mode_of_payment = "Card Payment Test"
@@ -132,7 +132,7 @@ class TestPaymentTaxResolution(FrappeTestCase):
             profile.posa_enable_payment_tax_templates = 1
             profile.write_off_account = self.account
             profile.write_off_cost_center = self.cost_center
-            
+
             # Add child payment tax templates
             profile.append("posa_payment_tax_templates", {
                 "mode_of_payment": "Cash Payment Test",
@@ -142,7 +142,7 @@ class TestPaymentTaxResolution(FrappeTestCase):
                 "mode_of_payment": "Card Payment Test",
                 "tax_template": self.card_tmpl_name
             })
-            
+
             # Add mandatory payments
             profile.append("payments", {
                 "mode_of_payment": "Cash Payment Test",
@@ -162,7 +162,7 @@ class TestPaymentTaxResolution(FrappeTestCase):
             profile.taxes_and_charges = self.cash_tmpl_name
             profile.write_off_account = self.account
             profile.write_off_cost_center = self.cost_center
-            
+
             profile.set("posa_payment_tax_templates", [])
             profile.append("posa_payment_tax_templates", {
                 "mode_of_payment": "Cash Payment Test",
@@ -172,7 +172,7 @@ class TestPaymentTaxResolution(FrappeTestCase):
                 "mode_of_payment": "Card Payment Test",
                 "tax_template": self.card_tmpl_name
             })
-            
+
             profile.set("payments", [])
             profile.append("payments", {
                 "mode_of_payment": "Cash Payment Test",
