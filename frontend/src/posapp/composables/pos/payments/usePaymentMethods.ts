@@ -27,6 +27,7 @@ export interface PaymentMethodsOptions {
 	getPaidChange?: () => number;
 	getCreditChange?: () => number;
 	onBackToInvoice?: () => void;
+	onBeforeSetFullAmount?: (_payment: any) => void;
 }
 
 export function usePaymentMethods(options: PaymentMethodsOptions) {
@@ -231,7 +232,6 @@ export function usePaymentMethods(options: PaymentMethodsOptions) {
 	// Set full amount for a payment mode
 	const set_full_amount = (payment: any, isReturn = false) => {
 		const doc = unref(invoiceDoc);
-		const invoiceAmount = getInvoiceSettlementAmount();
 		// Reset other payments
 		doc.payments.forEach((p: any) => {
 			if (p.mode_of_payment !== payment.mode_of_payment) {
@@ -239,6 +239,12 @@ export function usePaymentMethods(options: PaymentMethodsOptions) {
 				if (p.base_amount !== undefined) p.base_amount = 0;
 			}
 		});
+
+		if (typeof options.onBeforeSetFullAmount === "function") {
+			options.onBeforeSetFullAmount(payment);
+		}
+
+		const invoiceAmount = getInvoiceSettlementAmount();
 
 		payment.amount = invoiceAmount;
 		if (payment.base_amount !== undefined) {
@@ -252,7 +258,6 @@ export function usePaymentMethods(options: PaymentMethodsOptions) {
 
 	const set_rest_amount = (payment: any, isReturn = false) => {
 		const doc = unref(invoiceDoc);
-		const invoiceAmount = getInvoiceSettlementAmount();
 		const currentPaid = doc.payments.reduce(
 			(acc: number, p: any) => acc + flt(p.amount),
 			0,
@@ -260,6 +265,11 @@ export function usePaymentMethods(options: PaymentMethodsOptions) {
 		const currentPaymentAmount = flt(payment.amount);
 
 		const otherPayments = currentPaid - currentPaymentAmount;
+		if (otherPayments <= 0.0001 && typeof options.onBeforeSetFullAmount === "function") {
+			options.onBeforeSetFullAmount(payment);
+		}
+
+		const invoiceAmount = getInvoiceSettlementAmount();
 		let amount = invoiceAmount - otherPayments;
 		amount = flt(amount);
 		if (!isReturn) {

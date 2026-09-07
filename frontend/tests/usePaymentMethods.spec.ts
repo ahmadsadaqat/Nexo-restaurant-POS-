@@ -281,4 +281,57 @@ describe("usePaymentMethods", () => {
 			}),
 		]);
 	});
+
+	it("invokes onBeforeSetFullAmount and uses the updated settlement amount", () => {
+		let settlementAmount = 100;
+		const invoiceDoc = ref<any>({
+			rounded_total: 100,
+			grand_total: 100,
+			conversion_rate: 1,
+			payments: [
+				{
+					mode_of_payment: "Cash",
+					amount: 100,
+					base_amount: 100,
+					default: 1,
+				},
+				{
+					mode_of_payment: "Card",
+					amount: 0,
+					base_amount: 0,
+				},
+			],
+		});
+
+		const onBeforeSetFullAmount = vi.fn((payment: any) => {
+			if (payment.mode_of_payment === "Card") {
+				// Simulate recalculateTaxes adding 15 tax
+				settlementAmount = 115;
+				invoiceDoc.value.rounded_total = 115;
+				invoiceDoc.value.grand_total = 115;
+			}
+		});
+
+		const { set_full_amount } = usePaymentMethods({
+			invoiceDoc,
+			posProfile: ref({}),
+			diffPayment: computed(() => 0),
+			getNetInvoiceAmount: () => settlementAmount,
+			stores: {
+				toastStore: { show: () => undefined },
+				uiStore: { freeze: () => undefined, unfreeze: () => undefined },
+			},
+			onBeforeSetFullAmount,
+		});
+
+		set_full_amount(invoiceDoc.value.payments[1]);
+
+		expect(onBeforeSetFullAmount).toHaveBeenCalledWith(
+			invoiceDoc.value.payments[1],
+		);
+		expect(invoiceDoc.value.payments[0].amount).toBe(0);
+		expect(invoiceDoc.value.payments[1].amount).toBe(115);
+		expect(invoiceDoc.value.payments[1].base_amount).toBe(115);
+	});
 });
+

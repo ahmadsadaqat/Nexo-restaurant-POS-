@@ -633,6 +633,9 @@ const {
 	getPaidChange: () => paid_change.value,
 	getCreditChange: () => credit_change.value,
 	onBackToInvoice: () => eventBus.emit("change_active_view", "Invoice"),
+	onBeforeSetFullAmount: (payment) => {
+		recalculateTaxesForPayments(payment?.mode_of_payment);
+	},
 });
 
 const {
@@ -1811,14 +1814,14 @@ const queueShortcutSubmit = (payload = {}) => {
 	}
 };
 
-const recalculateTaxesForPayments = () => {
+const recalculateTaxesForPayments = (preferredMop = null) => {
 	if (!invoice_doc.value || !pos_profile.value) return;
 
 	const enabled = pos_profile.value.posa_enable_payment_tax_templates;
 	if (!enabled) return;
 
 	const payments = invoice_doc.value.payments || [];
-	let bestMop = null;
+	let bestMop = preferredMop || null;
 	let bestAmount = 0;
 
 	const mappings = {};
@@ -1830,24 +1833,30 @@ const recalculateTaxesForPayments = () => {
 		});
 	}
 
-	payments.forEach((p) => {
-		const mop = p.mode_of_payment;
-		const amount = Math.abs(flt(p.amount));
-		if (mop && amount > bestAmount && mappings[mop]) {
-			bestAmount = amount;
-			bestMop = mop;
-		}
-	});
+	if (!bestMop) {
+		payments.forEach((p) => {
+			const mop = p.mode_of_payment;
+			const amount = Math.abs(flt(p.amount));
+			if (mop && amount > bestAmount && mappings[mop]) {
+				bestAmount = amount;
+				bestMop = mop;
+			}
+		});
+	}
 
 	const targetTemplate = bestMop ? mappings[bestMop] : pos_profile.value.taxes_and_charges;
 	if (!targetTemplate) return;
 
-	if (invoice_doc.value.taxes_and_charges === targetTemplate && invoice_doc.value.taxes?.length > 0) {
-		return;
-	}
-
 	const tmpl = getTaxTemplate(targetTemplate);
 	if (!tmpl) return;
+
+	const expectedTaxCount = Array.isArray(tmpl.taxes) ? tmpl.taxes.length : 0;
+	if (
+		invoice_doc.value.taxes_and_charges === targetTemplate &&
+		(invoice_doc.value.taxes?.length || 0) === expectedTaxCount
+	) {
+		return;
+	}
 
 	invoice_doc.value.taxes_and_charges = targetTemplate;
 	invoice_doc.value.taxes = [];
@@ -1909,9 +1918,34 @@ const recalculateTaxesForPayments = () => {
 	}
 
 	invoice_doc.value.grand_total = grandTotal;
-	invoice_doc.value.rounded_total = Math.round(grandTotal);
+	if (pos_profile.value.disable_rounded_total) {
+		invoice_doc.value.rounded_total = flt(grandTotal, currency_precision.value);
+	} else {
+		invoice_doc.value.rounded_total = Math.round(grandTotal);
+	}
 	invoice_doc.value.base_grand_total = toCompanyCurrency(context, grandTotal);
 	invoice_doc.value.base_rounded_total = toCompanyCurrency(context, invoice_doc.value.rounded_total);
+
+	const activeMop = preferredMop || bestMop;
+	if (activeMop) {
+		const otherPaid = payments
+			.filter((p) => p.mode_of_payment !== activeMop)
+			.reduce((sum, p) => sum + Math.abs(flt(p.amount)), 0);
+
+		if (otherPaid <= 0.0001) {
+			const targetPayment = payments.find((p) => p.mode_of_payment === activeMop);
+			if (targetPayment) {
+				const settlementAmount = netInvoiceSettlementAmount.value;
+				targetPayment.amount = settlementAmount;
+				if (targetPayment.base_amount !== undefined) {
+					targetPayment.base_amount = flt(
+						toCompanyCurrency(context, settlementAmount),
+						currency_precision.value,
+					);
+				}
+			}
+		}
+	}
 };
 
 // Watchers
