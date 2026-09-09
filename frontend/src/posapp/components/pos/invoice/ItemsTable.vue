@@ -60,6 +60,7 @@
 					:showDiscountPercent="isColumnVisible('discount_percentage')"
 					:showDiscountAmount="isColumnVisible('discount_amount')"
 					:showMarketRate="isColumnVisible('market_rate')"
+					:showAmountAfterTax="isColumnVisible('amount_after_tax')"
 					:showOffer="isColumnVisible('posa_is_offer')"
 					@update-qty="handleQtyUpdate"
 					@qty-edit-submitted="handleQtyEditSubmitted"

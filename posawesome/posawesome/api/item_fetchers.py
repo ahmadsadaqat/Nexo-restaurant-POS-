@@ -86,10 +86,14 @@ def _fetch_item_prices(
         "today": today,
         "customer": customer or "",
     }
-    query = """
+    has_market_rate = frappe.db.has_column("Item Price", "market_rate")
+    market_rate_col = "market_rate," if has_market_rate else "0.0 as market_rate,"
+
+    query = f"""
         SELECT
             item_code,
             price_list_rate,
+            {market_rate_col}
             currency,
             uom,
             customer
@@ -97,6 +101,7 @@ def _fetch_item_prices(
             SELECT
                 item_code,
                 price_list_rate,
+                {market_rate_col}
                 currency,
                 uom,
                 customer,
@@ -611,7 +616,7 @@ def merge_item_row(
             "serial_no_data": lookup_data.serial_map.get(item_code, []),
             "rate": price_row.get("price_list_rate") if price_row else 0,
             "price_list_rate": price_row.get("price_list_rate") if price_row else 0,
-            "market_rate": 0,
+            "market_rate": flt(price_row.get("market_rate")) if price_row else flt(item.get("market_rate") or 0),
             "currency": price_currency or price_list_currency,
             "price_list_currency": price_list_currency,
             "plc_conversion_rate": exchange_rate,

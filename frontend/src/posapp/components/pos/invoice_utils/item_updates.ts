@@ -79,6 +79,9 @@ export async function update_items_details(context: any, items: any[]) {
 				if (updated_item.item_tax_rate !== undefined) {
 					item.item_tax_rate = updated_item.item_tax_rate;
 				}
+				if (updated_item.market_rate !== undefined) {
+					item.market_rate = updated_item.market_rate;
+				}
 
 				if (
 					item.has_batch_no &&

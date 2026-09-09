@@ -129,6 +129,7 @@ export function useItemsTableResponsive(
 			rate: { min: 100, max: 130, ratio: 0.12 },
 			market_rate: { min: 100, max: 130, ratio: 0.12 },
 			amount: { min: 100, max: 130, ratio: 0.12 },
+			amount_after_tax: { min: 110, max: 140, ratio: 0.13 },
 			discount_value: { min: 90, max: 120, ratio: 0.1 },
 			discount_amount: { min: 90, max: 120, ratio: 0.11 },
 			price_list_rate: { min: 120, max: 140, ratio: 0.13 },
@@ -152,6 +153,7 @@ export function useItemsTableResponsive(
 			rate: 100,
 			market_rate: 100,
 			amount: 100,
+			amount_after_tax: 110,
 			discount_value: 90,
 			discount_amount: 90,
 			price_list_rate: 120,
@@ -187,6 +189,7 @@ export function useItemsTableResponsive(
 						"discount_amount",
 						"price_list_rate",
 						"market_rate",
+						"amount_after_tax",
 						"uom",
 						"posa_is_offer",
 					].includes(header.key);

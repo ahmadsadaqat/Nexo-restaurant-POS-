@@ -338,6 +338,23 @@
 				</div>
 			</td>
 
+			<!-- Market Rate Column (Optional) -->
+			<td
+				v-else-if="column.key === 'market_rate'"
+				class="text-center"
+				:data-column-key="'market_rate'"
+			>
+				<div class="currency-display right-aligned">
+					<span class="currency-symbol">{{ currencySymbol(displayCurrency) }}</span>
+					<span
+						class="amount-value"
+						:class="{ 'negative-number': isNegative(item.market_rate) }"
+					>
+						{{ formatCurrency(item.market_rate || 0) }}
+					</span>
+				</div>
+			</td>
+
 			<!-- Amount Column -->
 			<td v-else-if="column.key === 'amount'" class="text-center" :data-column-key="'amount'">
 				<div class="currency-display right-aligned">
@@ -347,6 +364,23 @@
 						:class="{ 'negative-number': isNegative(item.qty * item.rate) }"
 					>
 						{{ formatCurrency(item.qty * item.rate) }}
+					</span>
+				</div>
+			</td>
+
+			<!-- Amount After Tax (Cash) Column (Optional) -->
+			<td
+				v-else-if="column.key === 'amount_after_tax'"
+				class="text-center"
+				:data-column-key="'amount_after_tax'"
+			>
+				<div class="currency-display right-aligned">
+					<span class="currency-symbol">{{ currencySymbol(displayCurrency) }}</span>
+					<span
+						class="amount-value"
+						:class="{ 'negative-number': isNegative(itemAmountAfterCashTax) }"
+					>
+						{{ formatCurrency(itemAmountAfterCashTax) }}
 					</span>
 				</div>
 			</td>
@@ -406,6 +440,7 @@
 
 <script setup>
 import { computed, nextTick, ref } from "vue";
+import { getItemAmountAfterCashTax } from "../../../utils/itemTaxUtils";
 
 defineOptions({
 	name: "CartItemRow",
@@ -440,6 +475,7 @@ const props = defineProps({
 	showDiscountPercent: Boolean,
 	showDiscountAmount: Boolean,
 	showMarketRate: Boolean,
+	showAmountAfterTax: Boolean,
 	showOffer: Boolean,
 });
 
@@ -478,6 +514,10 @@ const discountPercentInput = ref(null);
 const discountAmountInput = ref(null);
 const uomSelect = ref(null);
 
+const itemAmountAfterCashTax = computed(() => {
+	return getItemAmountAfterCashTax(props.item, props.posProfile);
+});
+
 const memoDeps = computed(() => {
 	return [
 		props.item.qty,
@@ -497,6 +537,7 @@ const memoDeps = computed(() => {
 		props.item.is_free_item,
 		props.item.price_list_rate,
 		props.item.market_rate,
+		itemAmountAfterCashTax.value,
 		// Include edit states to ensure UI updates when switching modes
 		isEditingQty.value,
 		isEditingRate.value,

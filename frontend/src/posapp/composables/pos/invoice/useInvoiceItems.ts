@@ -109,9 +109,15 @@ export function useInvoiceItems(invoiceType: Ref<string>) {
 			title: __("Market Rate"),
 			key: "market_rate",
 			align: "center",
-			required: true,
+			required: false,
 		},
 		{ title: __("Amount"), key: "amount", align: "center", required: true },
+		{
+			title: __("Tax"),
+			key: "amount_after_tax",
+			align: "center",
+			required: false,
+		},
 		{
 			title: __("Offer?"),
 			key: "posa_is_offer",
@@ -182,6 +188,16 @@ export function useInvoiceItems(invoiceType: Ref<string>) {
 							if (
 								col.key === "discount_amount" &&
 								pos_profile.value?.posa_display_discount_amount
+							)
+								return true;
+							if (
+								col.key === "market_rate" &&
+								pos_profile.value?.posa_display_market_rate
+							)
+								return true;
+							if (
+								col.key === "amount_after_tax" &&
+								pos_profile.value?.posa_display_amount_after_tax
 							)
 								return true;
 							return false;
