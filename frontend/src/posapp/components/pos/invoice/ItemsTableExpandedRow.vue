@@ -68,6 +68,22 @@
 							></v-select>
 						</div>
 					</div>
+					<div class="posa-form-row">
+						<div class="posa-form-field full-width">
+							<v-text-field
+								density="compact"
+								variant="outlined"
+								color="primary"
+								:label="frappe._('Item Remarks')"
+								class="pos-themed-input"
+								hide-details
+								v-model="item.posa_notes"
+								@update:model-value="onRemarksChange(item, $event)"
+								prepend-inner-icon="mdi-comment-text-outline"
+								clearable
+							></v-text-field>
+						</div>
+					</div>
 				</div>
 
 				<!-- Pricing Section -->
@@ -470,6 +486,12 @@ const frappe = (window as any).frappe || { _: (s: string) => s };
 
 const onQtyChange = (item: CartItem, event: any) => {
 	emit("qty-change", item, event);
+};
+
+const onRemarksChange = (item: CartItem, value: any) => {
+	const val = typeof value === "string" ? value : (value ?? "");
+	item.posa_notes = val;
+	item.remarks = val;
 };
 
 const getRaw = (item: any) => item?.raw || {};

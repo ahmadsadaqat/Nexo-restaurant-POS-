@@ -40,6 +40,8 @@ export interface CartItem extends Item {
 	price_list_rate?: number;
 	market_rate?: number;
 	currency?: string;
+	posa_notes?: string;
+	remarks?: string;
 	[key: string]: any;
 }
 
