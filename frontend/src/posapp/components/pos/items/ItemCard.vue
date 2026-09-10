@@ -209,7 +209,7 @@ const onDragEnd = (event) => {
 
 .card-item-image-container {
 	position: relative;
-	height: 132px;
+	height: clamp(96px, 13vh, 126px);
 	flex-shrink: 0;
 	overflow: hidden;
 	background: var(--pos-surface-muted);

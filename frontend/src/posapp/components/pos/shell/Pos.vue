@@ -4,32 +4,34 @@
 		:class="rtlClasses"
 		:style="[responsiveStyles, layoutStyleOverrides, rtlStyles]"
 	>
-		<Drafts></Drafts>
-		<InvoiceManagement></InvoiceManagement>
-		<SalesOrders></SalesOrders>
-		<Returns></Returns>
-		<NewAddress></NewAddress>
-		<MpesaPayments></MpesaPayments>
-		<Variants></Variants>
-		<OpeningDialog
-			v-if="dialog"
-			:dialog="dialog"
-			@close="closeOpeningDialog"
-			@register="handleRegisterPosData"
-		></OpeningDialog>
-		<v-dialog
-			v-if="usePaymentDialog"
-			v-model="paymentDialogOpen"
-			:retain-focus="false"
-			width="96vw"
-			max-width="1480"
-			scrim="rgba(15, 23, 42, 0.55)"
-			class="payment-dialog"
-			@update:model-value="handlePaymentDialogUpdate"
-			@after-leave="handlePaymentDialogAfterLeave"
-		>
-			<Payments dialog-mode />
-		</v-dialog>
+		<div class="pos-dialogs-container">
+			<Drafts></Drafts>
+			<InvoiceManagement></InvoiceManagement>
+			<SalesOrders></SalesOrders>
+			<Returns></Returns>
+			<NewAddress></NewAddress>
+			<MpesaPayments></MpesaPayments>
+			<Variants></Variants>
+			<OpeningDialog
+				v-if="dialog"
+				:dialog="dialog"
+				@close="closeOpeningDialog"
+				@register="handleRegisterPosData"
+			></OpeningDialog>
+			<v-dialog
+				v-if="usePaymentDialog"
+				v-model="paymentDialogOpen"
+				:retain-focus="false"
+				width="96vw"
+				max-width="1480"
+				scrim="rgba(15, 23, 42, 0.55)"
+				class="payment-dialog"
+				@update:model-value="handlePaymentDialogUpdate"
+				@after-leave="handlePaymentDialogAfterLeave"
+			>
+				<Payments dialog-mode />
+			</v-dialog>
+		</div>
 		<v-row
 			v-show="!dialog"
 			dense
@@ -87,10 +89,10 @@
 
 			<v-col
 				v-show="showCartPanel"
-				:xl="useCompactPosSwitcher ? 12 : 6"
-				:lg="useCompactPosSwitcher ? 12 : 6"
-				:md="useCompactPosSwitcher ? 12 : 6"
-				:sm="useCompactPosSwitcher ? 12 : 6"
+				:xl="invoiceCols"
+				:lg="invoiceCols"
+				:md="invoiceCols"
+				:sm="invoiceCols"
 				cols="12"
 				class="pos dynamic-col dynamic-col--invoice"
 			>
@@ -270,7 +272,14 @@ export default {
 			if (useCompactPosSwitcher.value) {
 				return 12;
 			}
-			return showCartPanel.value ? 6 : 12;
+			return showCartPanel.value ? 7 : 12;
+		});
+
+		const invoiceCols = computed(() => {
+			if (useCompactPosSwitcher.value) {
+				return 12;
+			}
+			return showCartPanel.value ? 5 : 12;
 		});
 		const isPhone = computed(() => responsive.isPhone.value);
 		const showBottomDock = computed(() => !dialog.value && responsive.windowWidth.value < 1100);
@@ -431,7 +440,7 @@ export default {
 			const fallbackBottomSpace = getFallbackBottomSpace();
 			const effectiveBottomSpace = showBottomDock.value
 				? Math.max(bottomDockHeight.value, fallbackBottomSpace)
-				: fallbackBottomSpace;
+				: 0;
 			return {
 				"--bottom-safe-space": `${effectiveBottomSpace}px`,
 			};
@@ -589,6 +598,7 @@ export default {
 			useCompactPosSwitcher,
 			showCartPanel,
 			selectorCols,
+			invoiceCols,
 			showBottomDock,
 			layoutStyleOverrides,
 			compactPanel,
@@ -704,6 +714,14 @@ export default {
 	min-width: 0;
 }
 
+.pos-dialogs-container {
+	position: absolute;
+	width: 0;
+	height: 0;
+	overflow: hidden;
+	pointer-events: none;
+}
+
 .dynamic-main-row {
 	padding: 0;
 	margin: 0;
@@ -715,9 +733,9 @@ export default {
 }
 
 .dynamic-col {
-	padding: var(--dynamic-sm);
+	padding: 4px 6px;
 	transition: padding 0.3s ease;
-	margin-top: var(--dynamic-sm);
+	margin-top: 0;
 }
 
 .dynamic-col--selector,

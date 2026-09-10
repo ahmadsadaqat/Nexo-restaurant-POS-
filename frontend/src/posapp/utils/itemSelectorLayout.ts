@@ -6,15 +6,17 @@
  * Calculates the number of columns based on container width.
  */
 export const getCardColumns = (containerWidth: number, windowWidth: number): number => {
-	const isFullScreen = containerWidth > windowWidth * 0.6;
-
 	if (windowWidth <= 768) {
 		return 2;
 	}
-	if (windowWidth <= 1200) {
-		return isFullScreen ? 5 : 3;
+	if (containerWidth > 0) {
+		const cols = Math.floor((containerWidth - 20) / 190);
+		return Math.max(2, Math.min(cols, 8));
 	}
-	return isFullScreen ? 7 : 4;
+	if (windowWidth <= 1200) {
+		return 3;
+	}
+	return 4;
 };
 
 /**

@@ -1,22 +1,24 @@
 <template>
 	<div class="items-selector-shell" :style="responsiveStyles">
-		<ScanErrorDialog
-			v-model="scanErrorDialog"
-			:message="scanErrorMessage"
-			:code="scanErrorCode"
-			:details="scanErrorDetails"
-			@acknowledge="acknowledgeScanError"
-		/>
-		<AddonDialog
-			v-model="addonDialog"
-			:item="selectedItemForAddon"
-			:pos-profile="pos_profile"
-			@confirm="addMainItemAndSelectedAddons"
-			@skip="addMainItemOnly"
-		/>
+		<div class="pos-dialogs-container">
+			<ScanErrorDialog
+				v-model="scanErrorDialog"
+				:message="scanErrorMessage"
+				:code="scanErrorCode"
+				:details="scanErrorDetails"
+				@acknowledge="acknowledgeScanError"
+			/>
+			<AddonDialog
+				v-model="addonDialog"
+				:item="selectedItemForAddon"
+				:pos-profile="pos_profile"
+				@confirm="addMainItemAndSelectedAddons"
+				@skip="addMainItemOnly"
+			/>
+		</div>
 		<v-card
 			:class="[
-				'selection selection-card mx-auto my-0 py-0 mt-3 pos-card dynamic-card resizable pos-themed-card',
+				'selection selection-card mx-auto my-0 py-0 pos-card dynamic-card resizable pos-themed-card',
 				{ 'selection-card--phone': isPhone },
 				rtlClasses,
 			]"
@@ -86,7 +88,7 @@
 							v-for="group in items_group"
 							:key="group"
 							:value="group"
-							v-slot="{ isSelected, toggle }"
+							v-slot="{ isSelected = false, toggle = () => {} } = {}"
 						>
 							<v-btn
 								:color="isSelected ? 'primary' : undefined"
@@ -1414,6 +1416,14 @@ defineExpose({
 	min-width: 0;
 }
 
+.pos-dialogs-container {
+	position: absolute;
+	width: 0;
+	height: 0;
+	overflow: hidden;
+	pointer-events: none;
+}
+
 .dynamic-padding {
 	/* Equal spacing on all sides for consistent alignment */
 	padding: var(--dynamic-xs);
@@ -1424,6 +1434,7 @@ defineExpose({
 
 .selection-card {
 	border-radius: 22px;
+	margin-top: 0 !important;
 }
 
 .selector-section-card {

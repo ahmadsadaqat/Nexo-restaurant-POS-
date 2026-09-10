@@ -41,13 +41,17 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 	const cardPadding = computed(() => getCardPadding(cardContainerWidth.value, windowWidth.value));
 
 	const cardRowHeight = computed(() => {
+		const vh = typeof window !== "undefined" ? window.innerHeight || 768 : 768;
+		if (vh <= 720) {
+			return 195;
+		}
+		if (vh <= 850) {
+			return 208;
+		}
 		if (windowWidth.value <= 768) {
-			return 210;
+			return 200;
 		}
-		if (windowWidth.value <= 1200) {
-			return 230;
-		}
-		return 240;
+		return 218;
 	});
 
 	const cardSlotHeight = computed(() => cardRowHeight.value + cardGap.value);
@@ -96,29 +100,27 @@ export function useItemSelectorLayout(options: SelectorLayoutOptions = {}) {
 			return;
 		}
 
-		// Calculate height strictly relative to the viewport.
+		// Calculate height relative to the viewport.
 		// Viewport height - Navbar (64px)
 		let containerHeight = window.innerHeight - 64;
 
 		// Deduct Pos.vue dynamic-container and dynamic-col padding/margins
-		// (.dynamic-col has ~12px padding + 12px margin-top, etc.)
-		containerHeight -= 40; 
+		containerHeight -= 32;
 
 		if (isNaN(containerHeight) || containerHeight <= 0) {
 			isOverflowing.value = false;
 			return;
 		}
 
-		const stickyHeader = el
-			.closest(".dynamic-padding")
-			?.querySelector(".sticky-header") as HTMLElement | null;
-		const headerHeight = stickyHeader ? stickyHeader.offsetHeight : 0;
+		const dynamicPadding = el.closest(".dynamic-padding") as HTMLElement | null;
+		const headerCard = dynamicPadding?.querySelector(".selector-header-card") as HTMLElement | null;
+		const slideGroup = dynamicPadding?.querySelector(".v-slide-group") as HTMLElement | null;
+		const headerHeight = (headerCard ? headerCard.offsetHeight : 56) + (slideGroup ? slideGroup.offsetHeight : 56);
 		
-		// Leave a small buffer for paddings/margins inside the card itself
-		const availableHeight = containerHeight - headerHeight - 20;
+		// Leave a buffer for paddings/margins inside the card itself
+		const availableHeight = containerHeight - headerHeight - 24;
 
-		// Only apply if calculated height is valid
-		if (availableHeight > 0) {
+		if (availableHeight > 80) {
 			el.style.height = `${availableHeight}px`;
 			isOverflowing.value = el.scrollHeight > availableHeight;
 		}
