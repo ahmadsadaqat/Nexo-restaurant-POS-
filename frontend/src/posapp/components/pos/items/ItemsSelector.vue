@@ -86,7 +86,7 @@
 							v-for="group in items_group"
 							:key="group"
 							:value="group"
-							v-slot="{ isSelected, toggle }"
+							v-slot="{ isSelected = false, toggle = () => {} } = {}"
 						>
 							<v-btn
 								:color="isSelected ? 'primary' : undefined"

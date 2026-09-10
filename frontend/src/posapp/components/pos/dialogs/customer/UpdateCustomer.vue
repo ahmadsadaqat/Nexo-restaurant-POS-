@@ -248,7 +248,7 @@ export default {
 		tax_id: "",
 		mobile_no: "",
 		address_line1: "",
-		city: "",
+		city: "Lodhran",
 		country: "Pakistan",
 		email_id: "",
 		referral_code: "",
@@ -367,8 +367,13 @@ export default {
 		focusCustomerNameField() {
 			this.$nextTick(() => {
 				const field = this.$refs.customerNameField;
-				if (field && typeof field.focus === "function") {
-					field.focus();
+				if (field) {
+					if (typeof field.focus === "function") {
+						field.focus();
+					} else {
+						const input = field.$el?.querySelector?.("input");
+						input?.focus?.();
+					}
 				}
 			});
 		},
@@ -435,7 +440,7 @@ export default {
 			this.tax_id = "";
 			this.mobile_no = "";
 			this.address_line1 = "";
-			this.city = "";
+			this.city = "Lodhran";
 			this.country = (this.pos_profile && this.pos_profile.posa_default_country) || "Pakistan";
 			this.email_id = "";
 			this.referral_code = "";
@@ -578,7 +583,7 @@ export default {
 				tax_id: this.tax_id,
 				mobile_no: this.mobile_no,
 				address_line1: this.address_line1,
-				city: this.city,
+				city: this.city || "Lodhran",
 				country: this.country,
 				email_id: this.email_id,
 				referral_code: this.referral_code,
@@ -698,7 +703,7 @@ export default {
 						this.customer_name = data.customer_name || data.name || ""; // fallback
 						this.customer_id = data.name;
 						this.address_line1 = data.primary_address || data.address_line1 || "";
-						this.city = data.city || "";
+						this.city = data.city || "Lodhran";
 						this.country =
 							data.country ||
 							(this.pos_profile && this.pos_profile.posa_default_country) ||

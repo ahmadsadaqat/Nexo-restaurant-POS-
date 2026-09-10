@@ -1,7 +1,6 @@
 <template>
-	<v-row justify="center">
-		<v-dialog v-model="visible" max-width="500px" persistent>
-			<v-card min-height="300px" class="addon-dialog-card">
+	<v-dialog v-model="visible" max-width="500px" persistent>
+		<v-card min-height="300px" class="addon-dialog-card">
 				<v-card-title class="d-flex align-center justify-between pb-2 border-bottom">
 					<span class="text-h5 text-primary">{{ __("Select Add-Ons") }} - {{ item?.item_name || item?.item_code }}</span>
 					<v-spacer></v-spacer>
@@ -67,11 +66,12 @@
 				</v-card-actions>
 			</v-card>
 		</v-dialog>
-	</v-row>
 </template>
 
 <script setup>
 import { ref, watch, computed } from "vue";
+
+const __ = window.__ || ((text) => text);
 
 const props = defineProps({
 	modelValue: { type: Boolean, default: false },
