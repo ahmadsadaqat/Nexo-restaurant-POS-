@@ -80,7 +80,10 @@ export default {
 	},
 	data: () => ({
 		addressDialog: false,
-		address: {},
+		address: {
+			city: "Lodhran",
+			country: "Pakistan",
+		},
 		customer: "",
 		openNewAddressHandler: null,
 	}),
@@ -95,6 +98,12 @@ export default {
 			var vm = this;
 			this.address.customer = this.customer;
 			this.address.doctype = "Customer";
+			if (!this.address.city) {
+				this.address.city = "Lodhran";
+			}
+			if (!this.address.country) {
+				this.address.country = "Pakistan";
+			}
 			frappe.call({
 				method: "posawesome.posawesome.api.customers.make_address",
 				args: {

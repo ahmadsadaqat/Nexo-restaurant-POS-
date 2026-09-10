@@ -583,12 +583,18 @@ const disableDiscountEdit = computed(
 		!!props.item.posa_offer_applied,
 );
 
+function focusInputField(fieldRef) {
+	const el = fieldRef.value?.$el || fieldRef.value;
+	const input = el?.querySelector?.("input") || el;
+	input?.focus?.();
+}
+
 function openQtyEdit() {
 	if (disableInput.value) return;
 	isEditingQty.value = true;
 	editingQtyValue.value = "";
 	nextTick(() => {
-		qtyInput.value?.focus();
+		focusInputField(qtyInput);
 	});
 }
 
@@ -596,8 +602,7 @@ function openUomEdit() {
 	if (disableUomEdit.value) return;
 	isEditingUom.value = true;
 	nextTick(() => {
-		const target = uomSelect.value?.$el?.querySelector?.("input") || uomSelect.value;
-		target?.focus?.();
+		focusInputField(uomSelect);
 	});
 }
 
@@ -660,7 +665,7 @@ function openRateEdit() {
 	isEditingRate.value = true;
 	editingRateValue.value = "";
 	nextTick(() => {
-		rateInput.value?.focus();
+		focusInputField(rateInput);
 	});
 }
 
@@ -690,7 +695,7 @@ function openDiscountPercentEdit() {
 	isEditingDiscountPercent.value = true;
 	editingDiscountPercentValue.value = "";
 	nextTick(() => {
-		discountPercentInput.value?.focus();
+		focusInputField(discountPercentInput);
 	});
 }
 
@@ -722,7 +727,7 @@ function openDiscountAmountEdit() {
 	isEditingDiscountAmount.value = true;
 	editingDiscountAmountValue.value = "";
 	nextTick(() => {
-		discountAmountInput.value?.focus();
+		focusInputField(discountAmountInput);
 	});
 }
 
