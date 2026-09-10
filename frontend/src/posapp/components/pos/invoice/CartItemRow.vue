@@ -518,8 +518,13 @@ const itemAmountAfterCashTax = computed(() => {
 	return getItemAmountAfterCashTax(props.item, props.posProfile);
 });
 
+const visibleColumnsKey = computed(() =>
+	props.visibleColumns.map((c) => c.key).join(","),
+);
+
 const memoDeps = computed(() => {
 	return [
+		visibleColumnsKey.value,
 		props.item.qty,
 		props.item.rate,
 		props.item.amount,

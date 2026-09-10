@@ -47,10 +47,13 @@
 
 						<v-card flat class="invoice-section-card invoice-search-card pos-themed-card">
 							<div class="invoice-section-heading">
-								<h3 class="invoice-section-heading__title">{{ __("Invoice Items") }}</h3>
+								<h3 class="invoice-section-heading__title">
+									{{ isDeliveryOrder ? __("Delivery Address") : __("Invoice Items") }}
+								</h3>
 							</div>
 							<div class="invoice-inline-search">
 								<v-text-field
+									v-if="!isDeliveryOrder"
 									v-model="itemSearch"
 									density="compact"
 									variant="solo"
@@ -62,6 +65,14 @@
 									clearable
 									autocomplete="off"
 								></v-text-field>
+								<InvoiceDeliveryAddress
+									v-else
+									class="item-search-field"
+									:customer="customer"
+									:customer-info="customer_info"
+									:invoice-doc="invoice_doc"
+									@update:address="handleDeliveryAddressUpdate"
+								/>
 								<InvoiceItemsActionToolbar
 									ref="actionToolbar"
 									:itemSearch="itemSearch"
@@ -298,6 +309,7 @@ import CancelSaleDialog from "./invoice/CancelSaleDialog.vue";
 import InvoiceSummary from "./invoice/InvoiceSummary.vue";
 import ItemsTable from "./invoice/ItemsTable.vue";
 import InvoiceItemsActionToolbar from "./invoice/InvoiceItemsActionToolbar.vue";
+import InvoiceDeliveryAddress from "./invoice/InvoiceDeliveryAddress.vue";
 import PackedItemsDialog from "./invoice/PackedItemsDialog.vue";
 import PaymentConfirmationDialog from "./payments/PaymentConfirmationDialog.vue";
 import PriceListRateDialog from "./invoice/PriceListRateDialog.vue";
@@ -355,6 +367,7 @@ export default {
 			packedItems: packed_items,
 			invoiceDoc: invoice_doc,
 			invoiceType,
+			orderType,
 			flowToLoad,
 			flowContext,
 		} = storeToRefs(invoiceStore);
@@ -394,6 +407,7 @@ export default {
 			selectedCustomer,
 			customerRefreshToken,
 			invoiceType,
+			orderType,
 			flowToLoad,
 			flowContext,
 			itemsTableRef,
@@ -452,6 +466,7 @@ export default {
 
 	components: {
 		InvoiceCustomerSection,
+		InvoiceDeliveryAddress,
 		DeliveryCharges,
 		PostingDateRow,
 		MultiCurrencyRow,
@@ -464,6 +479,17 @@ export default {
 		PriceListRateDialog,
 	},
 	computed: {
+		isDeliveryOrder() {
+			const type = (
+				this.orderType ||
+				this.invoice_doc?.posa_order_type ||
+				this.invoiceStore?.orderType ||
+				""
+			)
+				.toLowerCase()
+				.trim();
+			return type === "delivery";
+		},
 		items: {
 			get() {
 				return this.invoiceStore.items;
@@ -561,6 +587,31 @@ export default {
 	},
 
 	methods: {
+		handleDeliveryAddressUpdate(addressData) {
+			if (!this.invoice_doc) {
+				return;
+			}
+			const addressName = addressData?.name || addressData?.shipping_address_name || null;
+			const addressDisplay = addressData?.display_title || addressData?.address_display || "";
+
+			this.invoice_doc.shipping_address_name = addressName;
+			if (addressName) {
+				this.invoice_doc.customer_address = addressName;
+			}
+			if (addressDisplay) {
+				this.invoice_doc.address_display = addressDisplay;
+			}
+
+			this.invoiceStore.mergeInvoiceDoc({
+				shipping_address_name: addressName,
+				customer_address: addressName,
+				address_display: addressDisplay,
+			});
+
+			if (this.pos_profile?.posa_use_delivery_charges) {
+				this.update_delivery_charges(this.conversion_rate, this.currency_precision);
+			}
+		},
 		formatDateForDisplay(date) {
 			if (!date) return "";
 			const parts = date.split("-");
@@ -1401,6 +1452,11 @@ export default {
 	},
 	watch: {
 		...invoiceWatchers,
+		isDeliveryOrder(val) {
+			if (val) {
+				this.itemSearch = "";
+			}
+		},
 		confirm_payment_dialog(val) {
 			if (val) {
 				this.$nextTick(() => {

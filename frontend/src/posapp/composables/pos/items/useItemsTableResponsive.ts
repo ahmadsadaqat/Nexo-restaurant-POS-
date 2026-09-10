@@ -164,43 +164,8 @@ export function useItemsTableResponsive(
 	};
 
 	const responsiveHeaders = computed(() => {
-		const width = containerWidth.value;
 		if (!headers.value || headers.value.length === 0) return [];
-
-		return headers.value
-			.filter((header) => {
-				if (
-					header.required ||
-					header.key === "item_name" ||
-					header.key === "qty" ||
-					header.key === "actions" ||
-					header.key === "amount"
-				) {
-					return true;
-				}
-
-				if (width < 450) {
-					return ["item_name", "qty", "amount", "actions"].includes(
-						header.key,
-					);
-				} else if (width < 650) {
-					return ![
-						"discount_value",
-						"discount_amount",
-						"price_list_rate",
-						"market_rate",
-						"amount_after_tax",
-						"uom",
-						"posa_is_offer",
-					].includes(header.key);
-				}
-				return true;
-			})
-			.map((header) => ({
-				...header,
-				width: calculateColumnWidth(header, width),
-				minWidth: calculateMinColumnWidth(header),
-			}));
+		return getResponsiveVisibleHeaders(headers.value, containerWidth.value);
 	});
 
 	const isColumnVisible = (key: string) => {

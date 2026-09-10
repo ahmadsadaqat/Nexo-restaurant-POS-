@@ -10,7 +10,7 @@
 		@dragleave="onDragLeaveFromSelector"
 	>
 		<v-data-table-virtual
-			:headers="responsiveHeaders"
+			:headers="finalVisibleColumns"
 			:items="items"
 			:expanded="expanded"
 			show-expand
