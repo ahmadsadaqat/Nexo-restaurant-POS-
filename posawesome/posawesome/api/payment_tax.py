@@ -76,6 +76,43 @@ def resolve_tax_template_for_payments(pos_profile, payments):
     return None
 
 
+def _fetch_item_tax_map(company, item_tax_template, existing_tax_rate=None):
+    """Retrieve mapping of tax account -> rate for an Item Tax Template,
+    without depending on ERPNext's get_item_tax_map which has incompatible
+    signatures across ERPNext versions.
+    """
+    item_map = {}
+    if existing_tax_rate:
+        try:
+            if isinstance(existing_tax_rate, str):
+                item_map = frappe.parse_json(existing_tax_rate) or {}
+            elif isinstance(existing_tax_rate, dict):
+                item_map = dict(existing_tax_rate)
+        except Exception:
+            item_map = {}
+
+    if not item_map and item_tax_template:
+        try:
+            template = frappe.get_cached_doc("Item Tax Template", item_tax_template)
+            for d in template.taxes:
+                if not company or frappe.get_cached_value("Account", d.tax_type, "company") == company:
+                    item_map[d.tax_type] = flt(d.tax_rate)
+        except Exception:
+            try:
+                details = frappe.get_all(
+                    "Item Tax Template Detail",
+                    filters={"parent": item_tax_template},
+                    fields=["tax_type", "tax_rate"],
+                )
+                for d in details:
+                    if d.tax_type and (not company or frappe.get_cached_value("Account", d.tax_type, "company") == company):
+                        item_map[d.tax_type] = flt(d.tax_rate)
+            except Exception:
+                pass
+
+    return item_map
+
+
 def sync_item_tax_template_rates(invoice_doc):
     """Ensure items with Item Tax Template ignore payment/invoice tax rates,
     and their specific tax accounts are present in invoice_doc.taxes table.
@@ -83,21 +120,23 @@ def sync_item_tax_template_rates(invoice_doc):
     if not invoice_doc.get("items"):
         return
 
-    from erpnext.stock.get_item_details import get_item_tax_template, get_item_tax_map
-
     # 1. Resolve item_tax_template for items that have it in Item master but not set on row
     for item in invoice_doc.items:
         if not item.get("item_tax_template") and item.get("item_code"):
-            tmpl = get_item_tax_template({
-                "company": invoice_doc.company,
-                "item_code": item.item_code,
-                "tax_category": invoice_doc.get("tax_category"),
-                "posting_date": invoice_doc.get("posting_date"),
-                "bill_date": invoice_doc.get("bill_date"),
-                "transaction_date": invoice_doc.get("transaction_date"),
-            })
-            if tmpl:
-                item.item_tax_template = tmpl
+            try:
+                from erpnext.stock.get_item_details import get_item_tax_template
+                tmpl = get_item_tax_template({
+                    "company": invoice_doc.company,
+                    "item_code": item.item_code,
+                    "tax_category": invoice_doc.get("tax_category"),
+                    "posting_date": invoice_doc.get("posting_date"),
+                    "bill_date": invoice_doc.get("bill_date"),
+                    "transaction_date": invoice_doc.get("transaction_date"),
+                })
+                if tmpl:
+                    item.item_tax_template = tmpl
+            except Exception:
+                pass
 
     has_item_templates = any(item.get("item_tax_template") for item in invoice_doc.items)
     if not has_item_templates:
@@ -130,7 +169,11 @@ def sync_item_tax_template_rates(invoice_doc):
     # that is NOT in the item's tax template is set to 0.0 in item.item_tax_rate
     for item in invoice_doc.items:
         if item.get("item_tax_template"):
-            item_map = get_item_tax_map(invoice_doc.company, item.item_tax_template, as_json=False) or {}
+            item_map = _fetch_item_tax_map(
+                invoice_doc.company,
+                item.item_tax_template,
+                existing_tax_rate=item.get("item_tax_rate"),
+            )
             for tax in invoice_doc.taxes:
                 if tax.account_head and tax.account_head not in item_map:
                     item_map[tax.account_head] = 0.0
