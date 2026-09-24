@@ -374,6 +374,11 @@ export default {
 						const input = field.$el?.querySelector?.("input");
 						input?.focus?.();
 					}
+					const input = field.$el?.querySelector?.("input") || (field.input ? field.input : null);
+					if (input && typeof input.setSelectionRange === "function" && input.value) {
+						const len = input.value.length;
+						input.setSelectionRange(len, len);
+					}
 				}
 			});
 		},
@@ -697,31 +702,35 @@ export default {
 			() => this.isUpdateCustomerDialogOpen,
 			(isOpen) => {
 				if (isOpen) {
-					this.focusCustomerNameField();
 					const data = this.customerToUpdate;
-					if (data) {
+					if (data && (data.name || data.customer_id)) {
 						this.customer_name = data.customer_name || data.name || ""; // fallback
-						this.customer_id = data.name;
+						this.customer_id = data.name || data.customer_id || "";
 						this.address_line1 = data.primary_address || data.address_line1 || "";
 						this.city = data.city || "Lodhran";
 						this.country =
 							data.country ||
 							(this.pos_profile && this.pos_profile.posa_default_country) ||
 							"Pakistan";
-						this.tax_id = data.tax_id;
-						this.mobile_no = data.mobile_no;
-						this.email_id = data.email_id;
-						this.referral_code = data.referral_code;
-						this.birthday = data.birthday;
-						this.group = data.customer_group;
-						this.territory = data.territory;
-						this.loyalty_points = data.loyalty_points;
-						this.loyalty_program = data.loyalty_program;
-						this.gender = data.gender;
+						this.tax_id = data.tax_id || "";
+						this.mobile_no = data.mobile_no || "";
+						this.email_id = data.email_id || "";
+						this.referral_code = data.referral_code || "";
+						this.birthday = data.birthday || "";
+						this.group = data.customer_group || frappe.defaults.get_user_default("Customer Group");
+						this.territory = data.territory || frappe.defaults.get_user_default("Territory");
+						this.loyalty_points = data.loyalty_points || null;
+						this.loyalty_program = data.loyalty_program || null;
+						this.gender = data.gender || "";
+						this.customer_type = data.customer_type || "Individual";
 					} else {
 						// Setup for new customer
 						this.clear_customer();
+						if (data && data.customer_name) {
+							this.customer_name = data.customer_name;
+						}
 					}
+					this.focusCustomerNameField();
 				}
 			},
 		);

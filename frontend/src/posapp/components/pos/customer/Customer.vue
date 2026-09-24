@@ -270,6 +270,7 @@ export default {
 		const isMenuOpen = ref(false);
 		const customerDropdown = ref(null);
 		const readonlyState = ref(false);
+		const customerSearchQuery = ref("");
 
 		let scrollContainer = null;
 
@@ -393,6 +394,7 @@ export default {
 				internalCustomer.value = selectedCustomer.value;
 			}
 			tempSelectedCustomer.value = null;
+			customerSearchQuery.value = "";
 		};
 
 		const onCustomerMenuToggle = (isOpen) => {
@@ -432,6 +434,7 @@ export default {
 		const onCustomerChange = (val) => {
 			if (val && val === selectedCustomer.value) {
 				internalCustomer.value = selectedCustomer.value;
+				customerSearchQuery.value = "";
 				toastStore.show({
 					title: __("Customer already selected"),
 					color: "error",
@@ -440,6 +443,7 @@ export default {
 			}
 
 			tempSelectedCustomer.value = val;
+			customerSearchQuery.value = "";
 
 			if (isMenuOpen.value && val) {
 				closeCustomerMenu();
@@ -449,6 +453,7 @@ export default {
 		};
 
 		const onCustomerSearch = (value) => {
+			customerSearchQuery.value = value || "";
 			if (isCustomerSearchLocked.value) {
 				return;
 			}
@@ -478,8 +483,57 @@ export default {
 			}
 		};
 
+		const getCandidateCustomerName = () => {
+			let term = (customerSearchQuery.value || "").trim();
+			if (!term) {
+				const inputEl = customerDropdown.value?.$el?.querySelector("input");
+				term = (inputEl?.value || "").trim();
+			}
+			if (!term && customersStore.searchTerm) {
+				term = (customersStore.searchTerm || "").trim();
+			}
+			return term;
+		};
+
+		const doesCustomerExist = (nameToCheck) => {
+			if (!nameToCheck) return false;
+			const clean = nameToCheck.trim().toLowerCase();
+			if (!clean) return false;
+
+			// Check currently selected customer
+			if (selectedCustomer.value) {
+				const selId = String(selectedCustomer.value).trim().toLowerCase();
+				const selName = String(customerInfo.value?.customer_name || "").trim().toLowerCase();
+				if (clean === selId || clean === selName) {
+					return true;
+				}
+			}
+
+			// Check loaded customers in store
+			const list = customers.value || [];
+			return list.some((c) => {
+				const cName = String(c.customer_name || "").trim().toLowerCase();
+				const cId = String(c.name || "").trim().toLowerCase();
+				return clean === cName || clean === cId;
+			});
+		};
+
 		const new_customer = () => {
-			customersStore.openUpdateCustomerDialog(null);
+			searchDebounce.cancel();
+			const candidateName = getCandidateCustomerName();
+			const shouldPrefill = Boolean(candidateName && !doesCustomerExist(candidateName));
+
+			if (isMenuOpen.value) {
+				closeCustomerMenu();
+			}
+
+			customerSearchQuery.value = "";
+
+			if (shouldPrefill) {
+				customersStore.openUpdateCustomerDialog({ customer_name: candidateName });
+			} else {
+				customersStore.openUpdateCustomerDialog(null);
+			}
 		};
 
 		const edit_customer = () => {
@@ -614,6 +668,7 @@ export default {
 			reload_customers,
 			networkOnline,
 			customerInfo,
+			customerSearchQuery,
 			formatCustomerMetric,
 		};
 	},

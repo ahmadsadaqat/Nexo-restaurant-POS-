@@ -151,4 +151,34 @@ describe("customersStore profile and customer dto handling", () => {
 		expect(observedCounts).toContain(201);
 		expect(observedCounts).toContain(449);
 	});
+
+	it("opens customer dialog with prefilled customer name for new customer", () => {
+		const store = useCustomersStore();
+
+		expect(store.isUpdateCustomerDialogOpen).toBe(false);
+		expect(store.customerToUpdate).toBeNull();
+
+		store.openUpdateCustomerDialog({ customer_name: "Muhammad ibrab" });
+
+		expect(store.isUpdateCustomerDialogOpen).toBe(true);
+		expect(store.customerToUpdate).toEqual({ customer_name: "Muhammad ibrab" });
+
+		store.closeUpdateCustomerDialog();
+
+		expect(store.isUpdateCustomerDialogOpen).toBe(false);
+		expect(store.customerToUpdate).toBeNull();
+	});
+
+	it("opens customer dialog with null when no prefilled customer name", () => {
+		const store = useCustomersStore();
+
+		store.openUpdateCustomerDialog(null);
+
+		expect(store.isUpdateCustomerDialogOpen).toBe(true);
+		expect(store.customerToUpdate).toBeNull();
+
+		store.closeUpdateCustomerDialog();
+
+		expect(store.isUpdateCustomerDialogOpen).toBe(false);
+	});
 });

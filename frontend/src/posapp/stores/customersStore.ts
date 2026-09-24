@@ -182,7 +182,9 @@ export const useCustomersStore = defineStore("customers", () => {
 	const customerProfileScope = ref("");
 	const refreshToken = ref(0);
 	const isUpdateCustomerDialogOpen = ref(false);
-	const customerToUpdate = ref<StoredCustomer | null>(null);
+	const customerToUpdate = ref<
+		StoredCustomer | Partial<StoredCustomer> | { customer_name?: string; [key: string]: any } | null
+	>(null);
 	let customerFetchPromise: Promise<void> | null = null;
 	const customerLoadLogState = {
 		local: false,
@@ -814,7 +816,13 @@ export const useCustomersStore = defineStore("customers", () => {
 		requestCustomerRefresh();
 	}
 
-	function openUpdateCustomerDialog(customer: StoredCustomer | null = null) {
+	function openUpdateCustomerDialog(
+		customer:
+			| StoredCustomer
+			| Partial<StoredCustomer>
+			| { customer_name?: string; [key: string]: any }
+			| null = null,
+	) {
 		customerToUpdate.value = customer;
 		isUpdateCustomerDialogOpen.value = true;
 	}
