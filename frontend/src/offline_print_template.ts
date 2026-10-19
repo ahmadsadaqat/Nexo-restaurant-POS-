@@ -67,8 +67,16 @@ export const DEFAULT_OFFLINE_PRINT_TEMPLATE = `<div class="print-format thermal-
             {% set item_tax = (item.amount * ns.total_tax_rate / 100) %}
             {% set item_total_with_tax = item.amount + item_tax %}
             {% set ns.calculated_amount_total = ns.calculated_amount_total + item_total_with_tax %}
+            {% set item_remarks = item.posa_notes or item.remarks or "" %}
             <tr>
-                <td style="text-align: left; padding: 4px 0; vertical-align: top; text-transform: uppercase;">{{ item.item_name }}</td>
+                <td style="text-align: left; padding: 4px 0; vertical-align: top; text-transform: uppercase;">
+                    {{ item.item_name }}
+                    {% if item_remarks %}
+                    <div style="font-size: 11px; font-weight: normal; font-style: italic; text-transform: none; margin-top: 2px;">
+                        Remarks: {{ item_remarks }}
+                    </div>
+                    {% endif %}
+                </td>
                 <td style="text-align: center; padding: 4px 0; vertical-align: top;">{{ item.qty | int }}</td>
                 <td style="text-align: right; padding: 4px 0; vertical-align: top;">{{ "%.2f" | format(item.rate) }}</td>
                 <td style="text-align: right; padding: 4px 0; vertical-align: top;">{{ "%.2f" | format(item_tax) }}</td>

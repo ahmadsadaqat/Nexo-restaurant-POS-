@@ -69,6 +69,59 @@ describe("get_invoice_doc", () => {
 		expect(doc.customer_name).toBe("New Customer");
 	});
 
+	it("preserves the selected delivery address on the first invoice save", () => {
+		const context: any = {
+			invoiceType: "Invoice",
+			pos_profile: {
+				company: "Test Company",
+				name: "Main POS",
+				currency: "PKR",
+				payments: [],
+			},
+			selected_currency: "PKR",
+			conversion_rate: 1,
+			company: { default_currency: "PKR" },
+			price_list_currency: "PKR",
+			get_price_list: () => "Standard Selling",
+			customer_info: {
+				customer: "CUST-001",
+				customer_name: "Delivery Customer",
+			},
+			customer: "CUST-001",
+			isReturnInvoice: false,
+			items: [],
+			packed_items: [],
+			Total: 0,
+			subtotal: 0,
+			additional_discount: 0,
+			additional_discount_percentage: 0,
+			roundAmount: (value: number) => value,
+			pos_opening_shift: { name: "SHIFT-1" },
+			posa_offers: [],
+			posa_coupons: [],
+			selected_delivery_charge: null,
+			delivery_charges_rate: 0,
+			posting_date_display: "2026-10-20",
+			formatDateForBackend: (value: string) => value,
+			invoice_doc: {
+				customer: "CUST-001",
+				customer_address: "ADDR-SELECTED",
+				address_display: "Selected billing display",
+				shipping_address_name: "ADDR-SELECTED",
+				shipping_address: "Selected delivery display",
+				payments: [],
+				taxes: [],
+			},
+		};
+
+		const doc = get_invoice_doc(context);
+
+		expect(doc.customer_address).toBe("ADDR-SELECTED");
+		expect(doc.address_display).toBe("Selected billing display");
+		expect(doc.shipping_address_name).toBe("ADDR-SELECTED");
+		expect(doc.shipping_address).toBe("Selected delivery display");
+	});
+
 	it("clears stale party details when customer changes on a reused source doc", () => {
 		const context: any = {
 			invoiceType: "Invoice",

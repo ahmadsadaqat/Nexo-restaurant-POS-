@@ -384,8 +384,9 @@ export function buildKotEscPosDocument(doc: Record<string, any>, options: RawDoc
 			lines.push(leftRight("", qtyDisplay, width));
 		}
 		
-		if (item.posa_notes) {
-			for (const noteLine of wrap(`* ${item.posa_notes}`, width - 2)) {
+		const itemRemarks = item.posa_notes || item.remarks;
+		if (itemRemarks) {
+			for (const noteLine of wrap(`* ${itemRemarks}`, width - 2)) {
 				lines.push(`  ${noteLine}`);
 			}
 		}

@@ -158,6 +158,21 @@ export function get_invoice_doc(context: any) {
 		doc = { ...sourceDoc };
 	}
 
+	// Address selection happens before a new invoice has a name. Preserve those
+	// fields explicitly so the first save (and the rider print that follows it)
+	// uses the address selected in the delivery-address card instead of allowing
+	// ERPNext to fall back to the customer's default address.
+	for (const fieldname of [
+		"customer_address",
+		"address_display",
+		"shipping_address_name",
+		"shipping_address",
+	]) {
+		if (Object.prototype.hasOwnProperty.call(sourceDoc, fieldname)) {
+			doc[fieldname] = sourceDoc[fieldname];
+		}
+	}
+
 	// Always set these fields first
 	doc.doctype = resolvePosDocumentDoctype({
 		invoiceType: context.invoiceType,

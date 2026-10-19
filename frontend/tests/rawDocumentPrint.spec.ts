@@ -8,6 +8,7 @@ vi.mock("../src/posapp/services/qzTray", () => ({
 
 import {
 	buildEscPosDocument,
+	buildKotEscPosDocument,
 	printRawDocumentViaQz,
 	shouldUseRawDocumentPrinting,
 } from "../src/posapp/services/rawDocumentPrint";
@@ -87,6 +88,29 @@ describe("rawDocumentPrint", () => {
 
 		expect(raw).toContain(longName.slice(0, 32));
 		expect(raw).toContain(longName.slice(32));
+	});
+
+	it("prints item remarks on KOT and rider tickets", () => {
+		const raw = buildKotEscPosDocument(
+			{
+				doctype: "POS Invoice",
+				name: "PINV-0001",
+				items: [
+					{
+						item_name: "Chicken Burger",
+						qty: 1,
+						remarks: "No onions",
+					},
+				],
+			},
+			{
+				doctype: "POS Invoice",
+				name: "PINV-0001",
+				profile: { posa_raw_print_width: 42 },
+			},
+		);
+
+		expect(raw).toContain("* No onions");
 	});
 
 	it("preserves localized receipt text and translates raw receipt labels", () => {

@@ -49,4 +49,27 @@ describe("offline print fallback totals", () => {
 		expect(html).toContain("Cash Received :");
 		expect(html).toContain("-80.00");
 	});
+
+	it("prints item remarks", async () => {
+		const html = await renderOfflineInvoiceHTML({
+			name: "ACC-SINV-REMARKS",
+			company: "Test Co",
+			customer: "Walk In",
+			posa_order_type: "Takeaway",
+			grand_total: 100,
+			payments: [{ mode_of_payment: "Cash", amount: 100 }],
+			items: [
+				{
+					item_name: "Item A",
+					qty: 1,
+					rate: 100,
+					amount: 100,
+					posa_notes: "Extra spicy",
+				},
+			],
+			taxes: [],
+		});
+
+		expect(html).toContain("Remarks: Extra spicy");
+	});
 });
