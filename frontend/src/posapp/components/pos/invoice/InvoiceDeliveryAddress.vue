@@ -328,6 +328,9 @@ const handleNewAddressCreated = (newAddr: any) => {
 	if (!normalized) return;
 	const existing = addresses.value.filter((a) => a.name !== normalized.name);
 	addresses.value = [...existing, normalized];
+	if (props.customer) {
+		saveCustomerAddressesCache(props.customer, addresses.value);
+	}
 	selectedAddressName.value = normalized.name;
 	emitAddress(normalized);
 };

@@ -10,51 +10,15 @@
 						<v-row>
 							<v-col cols="12">
 								<v-text-field
+									data-test="new-address-line-1"
 									density="compact"
 									color="primary"
-									:label="frappe._('Address Name')"
-									class="pos-themed-input"
-									hide-details
-									v-model="address.name"
-								></v-text-field>
-							</v-col>
-							<v-col cols="12">
-								<v-text-field
-									density="compact"
-									color="primary"
-									:label="frappe._('Address Line 1')"
+									:label="__('Address Line 1')"
 									class="pos-themed-input"
 									hide-details
 									v-model="address.address_line1"
-								></v-text-field>
-							</v-col>
-							<v-col cols="12">
-								<v-text-field
-									density="compact"
-									color="primary"
-									:label="frappe._('Address Line 2')"
-									class="pos-themed-input"
-									hide-details
-									v-model="address.address_line2"
-								></v-text-field>
-							</v-col>
-							<v-col cols="6">
-								<v-text-field
-									:label="__('City')"
-									density="compact"
-									color="primary"
-									class="pos-themed-input"
-									hide-details
-									v-model="address.city"
-								></v-text-field>
-							</v-col>
-							<v-col cols="6">
-								<v-text-field
-									:label="__('State')"
-									density="compact"
-									class="pos-themed-input"
-									hide-details
-									v-model="address.state"
+									autofocus
+									@keyup.enter="submit_dialog"
 								></v-text-field>
 							</v-col>
 						</v-row>
@@ -63,7 +27,16 @@
 				<v-card-actions>
 					<v-spacer></v-spacer>
 					<v-btn color="error" theme="dark" @click="close_dialog">{{ __("Close") }}</v-btn>
-					<v-btn color="success" theme="dark" @click="submit_dialog">{{ __("Submit") }}</v-btn>
+					<v-btn
+						data-test="new-address-submit"
+						color="success"
+						theme="dark"
+						:loading="creatingAddress"
+						:disabled="creatingAddress"
+						@click="submit_dialog"
+					>
+						{{ __("Submit") }}
+					</v-btn>
 				</v-card-actions>
 			</v-card>
 		</v-dialog>
@@ -81,10 +54,10 @@ export default {
 	data: () => ({
 		addressDialog: false,
 		address: {
-			city: "Lodhran",
-			country: "Pakistan",
+			address_line1: "",
 		},
 		customer: "",
+		creatingAddress: false,
 		openNewAddressHandler: null,
 	}),
 	computed: {},
@@ -92,40 +65,52 @@ export default {
 	methods: {
 		close_dialog() {
 			this.addressDialog = false;
+			this.address = { address_line1: "" };
 		},
 
 		submit_dialog() {
-			var vm = this;
-			this.address.customer = this.customer;
-			this.address.doctype = "Customer";
-			if (!this.address.city) {
-				this.address.city = "Lodhran";
+			const addressLine1 = (this.address.address_line1 || "").trim();
+			if (!addressLine1) {
+				this.toastStore.show({
+					text: __("Address Line 1 is required."),
+					color: "warning",
+				});
+				return;
 			}
-			if (!this.address.country) {
-				this.address.country = "Pakistan";
-			}
+
+			this.creatingAddress = true;
 			frappe.call({
 				method: "posawesome.posawesome.api.customers.make_address",
 				args: {
-					args: this.address,
+					args: {
+						name: addressLine1,
+						address_line1: addressLine1,
+						customer: this.customer,
+						doctype: "Customer",
+					},
 				},
 				callback: (r) => {
+					this.creatingAddress = false;
 					if (!r.exc) {
-						vm.eventBus.emit("add_the_new_address", r.message);
-						vm.toastStore.show({
+						this.eventBus.emit("add_the_new_address", r.message);
+						this.toastStore.show({
 							text: __("Customer Address created successfully."),
 							color: "success",
 						});
-						vm.addressDialog = false;
-						vm.customer = "";
-						vm.address = {};
+						this.addressDialog = false;
+						this.customer = "";
+						this.address = { address_line1: "" };
 					}
+				},
+				error: () => {
+					this.creatingAddress = false;
 				},
 			});
 		},
 	},
 	created: function () {
 		this.openNewAddressHandler = (data) => {
+			this.address = { address_line1: "" };
 			this.addressDialog = true;
 			this.customer = data;
 		};

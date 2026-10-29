@@ -233,4 +233,57 @@ describe("InvoiceDeliveryAddress component", () => {
 			}),
 		);
 	});
+
+	it("selects and caches a newly created address for the current customer", async () => {
+		mockGetCachedCustomerAddresses.mockReturnValue([]);
+		const handlers: Record<string, (payload: any) => void> = {};
+		const eventBus = {
+			on: vi.fn((event: string, handler: (payload: any) => void) => {
+				handlers[event] = handler;
+			}),
+			off: vi.fn(),
+			emit: vi.fn(),
+		};
+
+		const { default: InvoiceDeliveryAddress } = await import(
+			"../src/posapp/components/pos/invoice/InvoiceDeliveryAddress.vue"
+		);
+
+		const onUpdateAddress = vi.fn();
+		const wrapper = shallowMount(InvoiceDeliveryAddress, {
+			props: {
+				customer: "John Doe",
+				invoiceDoc: {},
+				"onUpdate:address": onUpdateAddress,
+			},
+			global: {
+				provide: { eventBus },
+			},
+		});
+
+		await flushPromises();
+		handlers.add_the_new_address({
+			name: "789 Oak Avenue-Shipping",
+			address_title: "789 Oak Avenue",
+			address_line1: "789 Oak Avenue",
+			address_type: "Shipping",
+		});
+		await flushPromises();
+
+		expect((wrapper.vm as any).selectedAddressName).toBe(
+			"789 Oak Avenue-Shipping",
+		);
+		expect(onUpdateAddress).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				name: "789 Oak Avenue-Shipping",
+				address_line1: "789 Oak Avenue",
+			}),
+		);
+		expect(mockSaveCustomerAddressesCache).toHaveBeenLastCalledWith(
+			"John Doe",
+			expect.arrayContaining([
+				expect.objectContaining({ name: "789 Oak Avenue-Shipping" }),
+			]),
+		);
+	});
 });
