@@ -403,8 +403,7 @@ export async function getQzCertificateDownload() {
 }
 
 export function getQzCertificateFilename(company?: string | null) {
-	const clean = (company || "").replace(/[^a-zA-Z0-9_\- ]/g, "").trim();
-	return clean ? `${clean}.crt` : "certificate.crt";
+	return "override.crt";
 }
 
 export async function printHtmlViaQz(html: string, options: QzPrintHtmlOptions = {}) {

@@ -96,13 +96,22 @@
 						:disabled="!qzCertReady"
 						@click="handleDownloadCertificate"
 					>
-						{{ __("Download Certificate") }}
+						{{ __("Download Certificate (override.crt)") }}
 					</v-btn>
 				</div>
 
-				<div class="text-caption mt-3">
-					{{ __("Import the certificate into QZ Tray and restart QZ Tray on each POS machine.") }}
-				</div>
+				<v-card variant="tonal" color="info" class="pa-3 mt-3">
+					<div class="text-subtitle-2 font-weight-bold d-flex align-center">
+						<v-icon start size="18">mdi-shield-check</v-icon>
+						{{ __("How to Eliminate Print Confirmation Popups (Silent Printing)") }}:
+					</div>
+					<ol class="text-caption mt-2 pl-4">
+						<li>{{ __("Click 'Download Certificate' above to save 'override.crt'.") }}</li>
+						<li>{{ __("On Windows: press Win + R, type '%APPDATA%\\qz' and hit Enter.") }}</li>
+						<li>{{ __("Copy the downloaded 'override.crt' file into that folder.") }}</li>
+						<li>{{ __("Right-click the QZ Tray icon in your Windows taskbar tray -> Exit, then restart QZ Tray.") }}</li>
+					</ol>
+				</v-card>
 			</v-card-text>
 
 			<v-card-actions>

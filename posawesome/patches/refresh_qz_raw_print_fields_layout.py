@@ -71,11 +71,14 @@ def execute():
                 updates,
                 update_modified=False,
             )
-        elif fieldname == "posa_section_print_delivery":
+        elif fieldname in ("posa_section_print_delivery", "posa_qz_printer_name"):
             create_custom_field(
                 "POS Profile",
                 {
                     "fieldname": fieldname,
+                    "label": _("QZ Tray Printer Name") if fieldname == "posa_qz_printer_name" else _("Printing and Delivery"),
+                    "fieldtype": "Data" if fieldname == "posa_qz_printer_name" else "Section Break",
+                    "description": _("Default printer name reported by QZ Tray for raw and silent printing.") if fieldname == "posa_qz_printer_name" else "",
                     **updates,
                 },
             )

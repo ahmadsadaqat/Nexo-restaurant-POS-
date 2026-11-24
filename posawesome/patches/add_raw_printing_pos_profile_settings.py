@@ -4,6 +4,13 @@ from frappe.custom.doctype.custom_field.custom_field import create_custom_field
 
 FIELDS = [
     {
+        "fieldname": "posa_qz_printer_name",
+        "label": "QZ Tray Printer Name",
+        "fieldtype": "Data",
+        "insert_after": "posa_silent_print",
+        "description": "Default printer name reported by QZ Tray for raw and silent printing.",
+    },
+    {
         "fieldname": "posa_raw_printing",
         "label": "Use Raw Receipt Printing",
         "fieldtype": "Check",
