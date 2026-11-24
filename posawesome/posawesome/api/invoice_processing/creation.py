@@ -795,6 +795,11 @@ def _get_mutable_invoice_doc(data, doctype):
         )
         return frappe.get_doc(fresh_payload)
 
+    _clear_stale_party_fields_in_payload(
+        data,
+        previous_customer,
+        previous_values=previous_values,
+    )
     invoice_doc.update(data)
     invoice_doc = _clear_stale_party_fields_for_customer_change(
         invoice_doc,
@@ -848,14 +853,22 @@ def _resolve_payment_amounts(payment, conversion_rate=1):
     amount = payment.get("amount")
     base_amount = payment.get("base_amount")
 
+    def _precision(fieldname, default=2):
+        if hasattr(payment, "precision"):
+            try:
+                return payment.precision(fieldname)
+            except Exception:
+                pass
+        return default
+
     if amount in (None, "") and base_amount not in (None, ""):
-        amount = flt(flt(base_amount) / rate, payment.precision("amount"))
+        amount = flt(flt(base_amount) / rate, _precision("amount"))
 
     if amount in (None, ""):
         amount = 0
 
-    amount = flt(amount, payment.precision("amount"))
-    base_amount = flt(flt(amount) * rate, payment.precision("base_amount"))
+    amount = flt(amount, _precision("amount"))
+    base_amount = flt(flt(amount) * rate, _precision("base_amount"))
     return amount, base_amount
 
 
@@ -868,11 +881,19 @@ def _normalize_return_payment_rows(invoice_doc, conversion_rate=1):
             payment,
             invoice_doc.get("conversion_rate") or conversion_rate,
         )
-        payment.amount = -abs(resolved_amount)
-        payment.base_amount = -abs(resolved_base_amount)
+        if isinstance(payment, dict):
+            payment["amount"] = -abs(resolved_amount)
+            payment["base_amount"] = -abs(resolved_base_amount)
+        else:
+            payment.amount = -abs(resolved_amount)
+            payment.base_amount = -abs(resolved_base_amount)
 
-    invoice_doc.paid_amount = flt(sum(p.amount for p in invoice_doc.payments or []))
-    invoice_doc.base_paid_amount = flt(sum(p.base_amount for p in invoice_doc.payments or []))
+    invoice_doc.paid_amount = flt(sum(
+        (p.get("amount") if isinstance(p, dict) else p.amount) for p in invoice_doc.payments or []
+    ))
+    invoice_doc.base_paid_amount = flt(sum(
+        (p.get("base_amount") if isinstance(p, dict) else p.base_amount) for p in invoice_doc.payments or []
+    ))
 
     _guard_return_cash_refund(invoice_doc)
 
@@ -1071,9 +1092,16 @@ def update_invoice(data):
     invoice_doc.set_missing_values()
 
     if original_payments:
-        invoice_doc.set("payments", [])
+        if hasattr(invoice_doc, "set"):
+            invoice_doc.set("payments", [])
+        elif hasattr(invoice_doc, "payments"):
+            invoice_doc.payments = []
         for p in original_payments:
-            invoice_doc.append("payments", p)
+            row = frappe._dict(p) if hasattr(frappe, "_dict") and isinstance(p, dict) else p
+            if hasattr(invoice_doc, "append"):
+                invoice_doc.append("payments", row)
+            elif isinstance(getattr(invoice_doc, "payments", None), list):
+                invoice_doc.payments.append(row)
         if hasattr(invoice_doc, "set_account_for_mode_of_payment"):
             invoice_doc.set_account_for_mode_of_payment()
     if effective_price_list:
@@ -1083,6 +1111,30 @@ def update_invoice(data):
 
     # Reapply any custom item names after defaults are set
     _apply_item_name_overrides(invoice_doc, overrides)
+
+    # Re-apply explicit delivery addresses after set_missing_values has run,
+    # preventing ERPNext from reverting to the customer's initial default address
+    explicit_shipping = data.get("shipping_address_name")
+    explicit_customer_address = data.get("customer_address")
+    if explicit_shipping:
+        invoice_doc.shipping_address_name = explicit_shipping
+        try:
+            from frappe.contacts.doctype.address.address import render_address
+            rendered = render_address(explicit_shipping)
+        except Exception:
+            rendered = None
+        invoice_doc.shipping_address = rendered or data.get("shipping_address") or ""
+        if data.get("posa_order_type") == "Delivery" or not explicit_customer_address or explicit_customer_address == explicit_shipping:
+            invoice_doc.customer_address = explicit_shipping
+            invoice_doc.address_display = invoice_doc.shipping_address
+    elif explicit_customer_address:
+        invoice_doc.customer_address = explicit_customer_address
+        try:
+            from frappe.contacts.doctype.address.address import render_address
+            rendered = render_address(explicit_customer_address)
+        except Exception:
+            rendered = None
+        invoice_doc.address_display = rendered or data.get("address_display") or ""
 
     _apply_tax_contract_before_save(invoice_doc)
 
@@ -1147,7 +1199,13 @@ def update_invoice(data):
             )
 
     for payment in invoice_doc.payments:
-        payment.amount, payment.base_amount = _resolve_payment_amounts(payment, conversion_rate)
+        resolved_amount, resolved_base_amount = _resolve_payment_amounts(payment, conversion_rate)
+        if isinstance(payment, dict):
+            payment["amount"] = resolved_amount
+            payment["base_amount"] = resolved_base_amount
+        else:
+            payment.amount = resolved_amount
+            payment.base_amount = resolved_base_amount
 
     invoice_doc.base_total = flt(flt(invoice_doc.total) * conversion_rate, invoice_doc.precision("base_total"))
     invoice_doc.base_net_total = flt(
@@ -1271,6 +1329,17 @@ def submit_invoice(invoice, data, submit_in_background=False):
             del invoice["modified"]
         invoice_doc = frappe.get_doc(doctype, invoice_name)
         invoice_doc.update(invoice)
+        if invoice.get("shipping_address_name"):
+            invoice_doc.shipping_address_name = invoice.get("shipping_address_name")
+            try:
+                from frappe.contacts.doctype.address.address import render_address
+                rendered = render_address(invoice_doc.shipping_address_name)
+            except Exception:
+                rendered = None
+            invoice_doc.shipping_address = rendered or invoice.get("shipping_address") or ""
+            if invoice.get("posa_order_type") == "Delivery" or not invoice.get("customer_address") or invoice.get("customer_address") == invoice_doc.shipping_address_name:
+                invoice_doc.customer_address = invoice_doc.shipping_address_name
+                invoice_doc.address_display = invoice_doc.shipping_address
 
     set_invoice_client_request_id(invoice_doc, client_request_id)
     if ledger_doc:
@@ -1288,11 +1357,13 @@ def submit_invoice(invoice, data, submit_in_background=False):
 
     if not invoice_doc.get("custom_branch") and invoice_doc.get("pos_profile"):
         branch_val = None
-        meta = frappe.get_meta("POS Profile")
-        if meta.has_field("custom_branch"):
-            branch_val = frappe.db.get_value("POS Profile", invoice_doc.pos_profile, "custom_branch")
-        elif meta.has_field("branch"):
-            branch_val = frappe.db.get_value("POS Profile", invoice_doc.pos_profile, "branch")
+        if hasattr(frappe, "get_meta"):
+            meta = frappe.get_meta("POS Profile")
+            if hasattr(meta, "has_field"):
+                if meta.has_field("custom_branch"):
+                    branch_val = frappe.db.get_value("POS Profile", invoice_doc.pos_profile, "custom_branch")
+                elif meta.has_field("branch"):
+                    branch_val = frappe.db.get_value("POS Profile", invoice_doc.pos_profile, "branch")
         if branch_val:
             invoice_doc.custom_branch = branch_val
 

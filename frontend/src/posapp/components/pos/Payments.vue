@@ -2027,7 +2027,9 @@ watch(
 			invoice_doc.value.posa_delivery_date = null;
 			invoice_doc.value.posa_notes = null;
 			invoice_doc.value.posa_authorization_code = null;
-			invoice_doc.value.shipping_address_name = null;
+			if (invoice_doc.value.posa_order_type !== "Delivery" && !invoice_doc.value.shipping_address_name) {
+				invoice_doc.value.shipping_address_name = null;
+			}
 		} else if (invoice_doc.value && data === "Order") {
 			new_delivery_date.value = formatDateDisplay(frappe.datetime.now_date());
 			update_delivery_date();
@@ -2231,7 +2233,7 @@ watch(
 	() => invoice_doc.value.posa_delivery_date,
 	(date) => {
 		if (!date) {
-			if (invoice_doc.value) {
+			if (invoice_doc.value && invoice_doc.value.posa_order_type !== "Delivery" && !invoice_doc.value.shipping_address_name) {
 				invoice_doc.value.shipping_address_name = null;
 			}
 			addresses.value = [];

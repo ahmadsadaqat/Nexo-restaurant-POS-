@@ -296,7 +296,7 @@ export function useInvoiceDetails(options: InvoiceDetailsOptions) {
 		const doc = unref(invoiceDoc);
 		if (doc) {
 			doc.posa_delivery_date = formatted;
-			if (!formatted) {
+			if (!formatted && doc.posa_order_type !== "Delivery" && !doc.shipping_address_name) {
 				doc.shipping_address_name = null;
 			}
 		} else if (stores?.invoiceStore) {
@@ -305,7 +305,7 @@ export function useInvoiceDetails(options: InvoiceDetailsOptions) {
 			});
 		}
 
-		if (!formatted) {
+		if (!formatted && (!doc || doc.posa_order_type !== "Delivery")) {
 			addresses.value = [];
 		}
 	};

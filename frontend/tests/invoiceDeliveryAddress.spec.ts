@@ -286,4 +286,143 @@ describe("InvoiceDeliveryAddress component", () => {
 			]),
 		);
 	});
+
+	it("normalizes address and strips customer prefix for clean street address display", async () => {
+		mockGetCachedCustomerAddresses.mockReturnValue([
+			{
+				name: "0303030303003-Shipping",
+				address_title: "0303030303003 - Shipping",
+				address_line1: "Peshawar Kothi no 2",
+				city: "Lodhran",
+				country: "Pakistan",
+				address_type: "Shipping",
+			},
+		]);
+
+		const { default: InvoiceDeliveryAddress } = await import(
+			"../src/posapp/components/pos/invoice/InvoiceDeliveryAddress.vue"
+		);
+
+		const wrapper = shallowMount(InvoiceDeliveryAddress, {
+			props: {
+				customer: "0303030303003",
+				invoiceDoc: {},
+			},
+		});
+
+		await flushPromises();
+
+		const normalized = (wrapper.vm as any).addresses[0];
+		expect(normalized.full_address).toContain("Peshawar Kothi no 2");
+		expect(normalized.full_address).toContain("Lodhran");
+		expect(normalized.full_address).toContain("Pakistan");
+		// The title displayed should not start with customer ID / phone
+		expect(normalized.clean_display).toBe("Peshawar Kothi no 2, Lodhran, Pakistan");
+		expect(normalized.display_title).not.toContain("0303030303003");
+	});
+
+	it("emits open_edit_address on eventBus when edit button is clicked", async () => {
+		mockGetCachedCustomerAddresses.mockReturnValue([
+			{
+				name: "ADDR-001",
+				address_title: "Home",
+				address_line1: "123 Elm St",
+				city: "Springfield",
+			},
+		]);
+		const eventBus = {
+			on: vi.fn(),
+			off: vi.fn(),
+			emit: vi.fn(),
+		};
+
+		const { default: InvoiceDeliveryAddress } = await import(
+			"../src/posapp/components/pos/invoice/InvoiceDeliveryAddress.vue"
+		);
+
+		const wrapper = shallowMount(InvoiceDeliveryAddress, {
+			props: {
+				customer: "John Doe",
+				invoiceDoc: {},
+			},
+			global: {
+				provide: { eventBus },
+			},
+		});
+
+		await flushPromises();
+
+		(wrapper.vm as any).openEditAddressDialog();
+
+		expect(eventBus.emit).toHaveBeenCalledWith("open_edit_address", {
+			customer: "John Doe",
+			address: expect.objectContaining({
+				name: "ADDR-001",
+				address_line1: "123 Elm St",
+			}),
+		});
+	});
+
+	it("updates address in list and cache on address_updated event", async () => {
+		mockGetCachedCustomerAddresses.mockReturnValue([
+			{
+				name: "ADDR-001",
+				address_title: "Home",
+				address_line1: "123 Elm St",
+				city: "Springfield",
+			},
+		]);
+		const handlers: Record<string, (payload: any) => void> = {};
+		const eventBus = {
+			on: vi.fn((event: string, handler: (payload: any) => void) => {
+				handlers[event] = handler;
+			}),
+			off: vi.fn(),
+			emit: vi.fn(),
+		};
+
+		const { default: InvoiceDeliveryAddress } = await import(
+			"../src/posapp/components/pos/invoice/InvoiceDeliveryAddress.vue"
+		);
+
+		const onUpdateAddress = vi.fn();
+		const wrapper = shallowMount(InvoiceDeliveryAddress, {
+			props: {
+				customer: "John Doe",
+				invoiceDoc: {},
+				"onUpdate:address": onUpdateAddress,
+			},
+			global: {
+				provide: { eventBus },
+			},
+		});
+
+		await flushPromises();
+
+		// Fire address_updated event
+		handlers.address_updated({
+			name: "ADDR-001",
+			address_title: "456 Updated St",
+			address_line1: "456 Updated St",
+			city: "Springfield",
+		});
+		await flushPromises();
+
+		expect((wrapper.vm as any).selectedAddressName).toBe("ADDR-001");
+		expect(onUpdateAddress).toHaveBeenLastCalledWith(
+			expect.objectContaining({
+				name: "ADDR-001",
+				address_line1: "456 Updated St",
+			}),
+		);
+		expect(mockSaveCustomerAddressesCache).toHaveBeenLastCalledWith(
+			"John Doe",
+			expect.arrayContaining([
+				expect.objectContaining({
+					name: "ADDR-001",
+					address_line1: "456 Updated St",
+				}),
+			]),
+		);
+	});
 });

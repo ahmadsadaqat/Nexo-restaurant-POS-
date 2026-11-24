@@ -13,6 +13,7 @@ CUSTOMERS_API_PATH = REPO_ROOT / "posawesome" / "posawesome" / "api" / "customer
 
 class AttrDict(dict):
     __getattr__ = dict.get
+    __setattr__ = dict.__setitem__
 
 
 def _install_stubs():
@@ -60,6 +61,8 @@ def _install_stubs():
         get_value=lambda *args, **kwargs: None,
         count=lambda *args, **kwargs: 0,
         escape=lambda value: f"'{value}'",
+        table_exists=lambda doctype: True,
+        exists=lambda doctype, name=None: True,
     )
 
     frappe_utils_module.nowdate = lambda: "2026-05-21"
@@ -117,6 +120,51 @@ class TestCustomersApi(unittest.TestCase):
         self.assertNotIn("loyalty_points", rows[0])
         self.assertNotIn("conversion_factor", rows[0])
         self.assertEqual(self.state["loyalty_detail_calls"], 0)
+
+    def test_get_customer_orders_count(self):
+        counts = {"Sales Invoice": 7, "POS Invoice": 3}
+        count_calls = []
+
+        frappe = sys.modules["frappe"]
+        frappe.db.count = lambda doctype, filters=None: count_calls.append((doctype, filters)) or counts.get(doctype, 0)
+
+        total = self.module.get_customer_orders_count(customer="CUST-001", company="Test Company")
+
+        self.assertEqual(total, 10)
+        self.assertEqual(len(count_calls), 2)
+        self.assertEqual(count_calls[0][0], "Sales Invoice")
+        self.assertEqual(count_calls[0][1]["customer"], "CUST-001")
+        self.assertEqual(count_calls[0][1]["company"], "Test Company")
+        self.assertEqual(count_calls[0][1]["docstatus"], 1)
+
+    def test_update_address_updates_fields_and_saves(self):
+        saved = []
+        mock_doc = AttrDict({
+            "name": "ADDR-001",
+            "address_line1": "Old Address",
+            "address_title": "ADDR-001",
+            "city": "Old City",
+            "save": lambda ignore_permissions=False: saved.append(True),
+            "as_dict": lambda: dict(mock_doc),
+        })
+
+        frappe = sys.modules["frappe"]
+        frappe.get_doc = lambda doctype, name: mock_doc if doctype == "Address" and name == "ADDR-001" else None
+
+        result = self.module.update_address({
+            "name": "ADDR-001",
+            "address_line1": "New Street 123",
+            "city": "New City",
+        })
+
+        self.assertEqual(len(saved), 1)
+        self.assertEqual(result["address_line1"], "New Street 123")
+        self.assertEqual(result["city"], "New City")
+        self.assertEqual(result["address_title"], "New Street 123")
+
+    def test_update_address_without_name_throws(self):
+        with self.assertRaises(Exception):
+            self.module.update_address({"address_line1": "No name"})
 
 
 if __name__ == "__main__":

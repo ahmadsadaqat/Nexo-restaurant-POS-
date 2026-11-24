@@ -171,6 +171,24 @@ def get_customers_count(pos_profile):
 
 
 @frappe.whitelist()
+def get_customer_orders_count(customer=None, company=None):
+    customer = cstr(customer or "").strip()
+    if not customer:
+        return 0
+    filters = {"customer": customer, "docstatus": 1}
+    if company:
+        filters["company"] = company
+    count = frappe.db.count("Sales Invoice", filters=filters)
+    if frappe.db.table_exists("POS Invoice"):
+        pos_filters = {"customer": customer, "docstatus": 1}
+        if company:
+            pos_filters["company"] = company
+        pos_filters["consolidated_invoice"] = ["in", ["", None]]
+        count += frappe.db.count("POS Invoice", filters=pos_filters)
+    return count
+
+
+@frappe.whitelist()
 def get_customer_info(customer=None, company=None):
     customer = cstr(customer or "").strip()
     if not customer:
@@ -194,6 +212,7 @@ def get_customer_info(customer=None, company=None):
     res["posa_discount"] = customer.posa_discount
     res["name"] = customer.name
     res["customer_name"] = customer.customer_name
+    res["orders_count"] = get_customer_orders_count(customer.name, company=company)
     res["customer_group_price_list"] = frappe.get_value(
         "Customer Group", customer.customer_group, "default_price_list"
     )
@@ -483,7 +502,7 @@ def make_address(args):
     address = frappe.get_doc(
         {
             "doctype": "Address",
-            "address_title": args.get("name"),
+            "address_title": args.get("name") or args.get("address_line1"),
             "address_line1": args.get("address_line1"),
             "address_line2": args.get("address_line2"),
             "city": args.get("city") or "Lodhran",
@@ -491,10 +510,39 @@ def make_address(args):
             "pincode": args.get("pincode"),
             "country": args.get("country") or "Pakistan",
             "address_type": "Shipping",
-            "links": [{"link_doctype": args.get("doctype"), "link_name": args.get("customer")}],
+            "links": [{"link_doctype": args.get("doctype") or "Customer", "link_name": args.get("customer")}],
         }
     ).insert()
 
+    return address
+
+
+@frappe.whitelist()
+def update_address(args):
+    args = _load_json_arg(args)
+    address_name = args.get("name")
+    if not address_name or not frappe.db.exists("Address", address_name):
+        frappe.throw(_("Address not found"))
+    _assert_customer_write_allowed(args.get("pos_profile_doc"), company=args.get("company"))
+
+    address = frappe.get_doc("Address", address_name)
+    if args.get("address_title") is not None:
+        address.address_title = args.get("address_title")
+    if args.get("address_line1") is not None:
+        address.address_line1 = args.get("address_line1")
+        if not address.address_title or address.address_title == address_name:
+            address.address_title = args.get("address_line1")
+    if args.get("address_line2") is not None:
+        address.address_line2 = args.get("address_line2")
+    if args.get("city") is not None:
+        address.city = args.get("city")
+    if args.get("state") is not None:
+        address.state = args.get("state")
+    if args.get("country") is not None:
+        address.country = args.get("country")
+    if args.get("pincode") is not None:
+        address.pincode = args.get("pincode")
+    address.save(ignore_permissions=True)
     return address
 
 

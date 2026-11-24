@@ -57,8 +57,26 @@
 					</v-tooltip>
 				</template>
 
-				<!-- Add icon (right) -->
+				<!-- Add icon (right) & order count badge -->
 				<template #append-inner>
+					<v-tooltip
+						v-if="selectedCustomer && customerOrderCount !== null && customerOrderCount !== undefined"
+						:text="customerOrderCount === 1 ? __('1 previous order') : `${customerOrderCount} ${__('previous orders')}`"
+						content-class="posa-theme-tooltip"
+					>
+						<template #activator="{ props: tipProps }">
+							<v-chip
+								v-bind="tipProps"
+								size="x-small"
+								variant="tonal"
+								:color="customerOrderCount > 0 ? 'primary' : 'default'"
+								class="mr-1 customer-order-chip"
+							>
+								<v-icon start size="13">mdi-history</v-icon>
+								{{ customerOrderCount }} {{ customerOrderCount === 1 ? __('Order') : __('Orders') }}
+							</v-chip>
+						</template>
+					</v-tooltip>
 					<v-tooltip :text="__('Add new customer')" content-class="posa-theme-tooltip">
 						<template #activator="{ props }">
 							<v-icon
@@ -78,6 +96,9 @@
 					<v-list-item v-bind="props">
 						<v-list-item-subtitle v-if="item.raw.customer_name !== item.raw.name">
 							<div>{{ __("ID") }}: {{ item.raw.name }}</div>
+						</v-list-item-subtitle>
+						<v-list-item-subtitle v-if="item.raw.orders_count !== undefined && item.raw.orders_count !== null">
+							<div>{{ __("Orders") }}: {{ item.raw.orders_count }}</div>
 						</v-list-item-subtitle>
 						<v-list-item-subtitle v-if="item.raw.tax_id">
 							<div>{{ __("TAX ID") }}: {{ item.raw.tax_id }}</div>
@@ -217,6 +238,11 @@
 	cursor: not-allowed;
 }
 
+.customer-order-chip {
+	font-weight: 600;
+	cursor: default;
+}
+
 @media (max-width: 768px) {
 	.customer-input-wrapper {
 		padding-right: 0;
@@ -288,6 +314,16 @@ export default {
 			() =>
 				`${Number(loadedCustomerCount.value || 0).toLocaleString()} ${__("customers")}`,
 		);
+		const customerOrderCount = computed(() => {
+			if (!selectedCustomer.value) return null;
+			const infoCust = customerInfo.value?.customer || customerInfo.value?.name;
+			if (infoCust && infoCust !== selectedCustomer.value) {
+				return null;
+			}
+			const count = customerInfo.value?.orders_count;
+			if (count === undefined || count === null) return null;
+			return Number(count);
+		});
 		const customerFieldLabel = computed(() =>
 			showCustomerLoadProgress.value
 				? frappe._("Loading customers")
@@ -668,6 +704,8 @@ export default {
 			reload_customers,
 			networkOnline,
 			customerInfo,
+			selectedCustomer,
+			customerOrderCount,
 			customerSearchQuery,
 			formatCustomerMetric,
 		};

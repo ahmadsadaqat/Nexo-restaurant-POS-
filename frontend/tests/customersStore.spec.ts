@@ -65,6 +65,7 @@ describe("customersStore profile and customer dto handling", () => {
 			name: "CUST-001",
 			stored_value_balance: 0,
 			loyalty_points: 15,
+			orders_count: 5,
 		};
 
 		await store.addOrUpdateCustomer(customer);
@@ -75,6 +76,7 @@ describe("customersStore profile and customer dto handling", () => {
 				...customer,
 				loyalty_points: 15,
 				stored_value_balance: 0,
+				orders_count: 5,
 			}),
 		]);
 		expect(store.customerInfo).toEqual(info);

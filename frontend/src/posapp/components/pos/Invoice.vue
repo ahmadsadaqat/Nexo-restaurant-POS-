@@ -592,7 +592,12 @@ export default {
 				return;
 			}
 			const addressName = addressData?.name || addressData?.shipping_address_name || null;
-			const addressDisplay = addressData?.display_title || addressData?.address_display || "";
+			const addressDisplay =
+				addressData?.clean_display ||
+				addressData?.full_address ||
+				addressData?.display_title ||
+				addressData?.address_display ||
+				"";
 
 			this.invoice_doc.shipping_address_name = addressName;
 			if (addressName) {
@@ -600,12 +605,14 @@ export default {
 			}
 			if (addressDisplay) {
 				this.invoice_doc.address_display = addressDisplay;
+				this.invoice_doc.shipping_address = addressDisplay;
 			}
 
 			this.invoiceStore.mergeInvoiceDoc({
 				shipping_address_name: addressName,
 				customer_address: addressName,
 				address_display: addressDisplay,
+				shipping_address: addressDisplay,
 			});
 
 			if (this.pos_profile?.posa_use_delivery_charges) {

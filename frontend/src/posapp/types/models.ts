@@ -145,6 +145,7 @@ export interface CustomerSummary {
   email_id?: string;
   mobile_no?: string;
   primary_address?: string;
+  orders_count?: number;
   [key: string]: any;
 }
 

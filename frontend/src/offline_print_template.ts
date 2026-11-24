@@ -39,6 +39,15 @@ export const DEFAULT_OFFLINE_PRINT_TEMPLATE = `<div class="print-format thermal-
             Table No : {{ doc.posa_table_no or doc.table_no or doc.table or 'N/A' }}
         </div>
         {% endif %}
+        {% if doc.posa_order_type | lower == "delivery" %}
+        <div style="text-align: left; font-size: 12px; margin-top: 4px; padding: 4px; border: 1px dashed #000;">
+            <div><b>Customer:</b> {{ doc.customer_name or doc.customer }}</div>
+            {% if doc.contact_mobile or doc.mobile_no %}
+            <div><b>Phone:</b> {{ doc.contact_mobile or doc.mobile_no }}</div>
+            {% endif %}
+            <div><b>Address:</b> {{ doc.shipping_address or doc.address_display or '' }}</div>
+        </div>
+        {% endif %}
     </div>
 
     <div class="receipt-line"></div>
