@@ -1,71 +1,19 @@
 <template>
 	<div class="delivery-address-container" :title="selectedAddressFullText || ''">
-		<!-- Multiple Addresses: Show Dropdown -->
-		<v-autocomplete
-			v-if="hasMultipleAddresses"
-			ref="addressDropdown"
-			v-model="selectedAddressName"
-			:items="addressOptions"
-			item-title="title"
-			item-value="value"
-			density="compact"
-			variant="solo"
-			color="primary"
-			class="pos-themed-input sleek-field delivery-address-input"
-			:label="__('Delivery Address')"
-			:placeholder="__('Select delivery address')"
-			prepend-inner-icon="mdi-map-marker"
-			hide-details
-			clearable
-			autocomplete="off"
-			auto-select-first
-			:loading="loading"
-			@update:model-value="onAddressSelected"
-		>
-			<template #append-inner>
-				<v-icon
-					v-if="selectedAddress"
-					size="small"
-					class="icon-btn mr-1"
-					color="primary"
-					:title="__('Edit selected address')"
-					@click.stop="openEditAddressDialog"
-				>
-					mdi-pencil
-				</v-icon>
-				<v-icon
-					size="small"
-					class="icon-btn"
-					color="primary"
-					:title="__('Add new address')"
-					@click.stop="openNewAddressDialog"
-				>
-					mdi-plus
-				</v-icon>
-			</template>
-
-			<template #item="{ props: itemProps, item }">
-				<v-list-item v-bind="itemProps" :title="item.raw.title" :subtitle="item.raw.subtitle">
-					<template #prepend>
-						<v-icon size="small" color="primary">mdi-map-marker-outline</v-icon>
-					</template>
-				</v-list-item>
-			</template>
-		</v-autocomplete>
-
-		<!-- Single Address: Show Text Field with Fetched Address -->
+		<!-- Customer Has An Address: Show Single Address Field with Edit Action -->
 		<v-text-field
-			v-else-if="hasSingleAddress"
+			v-if="hasAddress"
 			:model-value="singleAddressDisplay"
 			density="compact"
 			variant="solo"
 			color="primary"
-			class="pos-themed-input sleek-field delivery-address-input"
+			class="pos-themed-input sleek-field delivery-address-input address-field-clickable"
 			:label="__('Delivery Address')"
 			prepend-inner-icon="mdi-map-marker"
 			hide-details
 			readonly
 			:loading="loading"
+			@click="openEditAddressDialog"
 		>
 			<template #append-inner>
 				<v-icon
@@ -76,15 +24,6 @@
 					@click.stop="openEditAddressDialog"
 				>
 					mdi-pencil
-				</v-icon>
-				<v-icon
-					size="small"
-					class="icon-btn"
-					color="primary"
-					:title="__('Add new address')"
-					@click.stop="openNewAddressDialog"
-				>
-					mdi-plus
 				</v-icon>
 			</template>
 		</v-text-field>
@@ -109,6 +48,7 @@
 			hide-details
 			:readonly="!customer"
 			:loading="loading"
+			@click="customer ? openNewAddressDialog() : undefined"
 			@update:model-value="onManualAddressInput"
 		></v-text-field>
 
@@ -210,25 +150,25 @@ const normalizeAddress = (address: any): DeliveryAddressItem | null => {
 	};
 };
 
-const hasMultipleAddresses = computed(() => addresses.value.length > 1);
-const hasSingleAddress = computed(() => addresses.value.length === 1);
+// Enforce single address model: a customer has 0 or 1 active delivery address
+const hasAddress = computed(() => addresses.value.length > 0 && Boolean(addresses.value[0]?.name));
+const hasSingleAddress = computed(() => hasAddress.value);
+const hasMultipleAddresses = computed(() => false);
 
 const selectedAddress = computed(() => {
-	if (hasSingleAddress.value && addresses.value[0]) {
+	if (addresses.value.length > 0 && addresses.value[0]) {
 		return addresses.value[0];
-	}
-	if (selectedAddressName.value) {
-		return addresses.value.find((a) => a.name === selectedAddressName.value) || null;
 	}
 	return null;
 });
 
 const singleAddressDisplay = computed(() => {
-	if (addresses.value.length === 1 && addresses.value[0]) {
+	if (addresses.value.length > 0 && addresses.value[0]) {
 		return (
 			addresses.value[0].clean_display ||
 			addresses.value[0].full_address ||
 			addresses.value[0].display_title ||
+			addresses.value[0].address_line1 ||
 			addresses.value[0].name ||
 			""
 		);
@@ -274,38 +214,35 @@ const emitAddress = (addr: DeliveryAddressItem | null) => {
 	emit("update:address", addr);
 };
 
+const pickPreferredAddress = (list: DeliveryAddressItem[]): DeliveryAddressItem | null => {
+	if (!list.length) return null;
+	// 1. If invoiceDoc already specifies an address
+	const existing =
+		props.invoiceDoc?.shipping_address_name ||
+		props.invoiceDoc?.customer_address;
+	if (existing) {
+		const match = list.find((a) => a.name === existing);
+		if (match) return match;
+	}
+	// 2. Shipping address type
+	const shipping = list.find((a) => (a.address_type || "").toLowerCase() === "shipping");
+	if (shipping) return shipping;
+	// 3. First address
+	return list[0] || null;
+};
+
 const syncSelection = () => {
-	if (!addresses.value.length) {
+	const preferred = addresses.value[0];
+	if (!preferred) {
 		selectedAddressName.value = null;
 		emitAddress(null);
 		return;
 	}
 
-	// 1. Check if invoiceDoc already specifies an address that exists
-	const existing =
-		props.invoiceDoc?.shipping_address_name ||
-		props.invoiceDoc?.customer_address;
-	if (existing && addresses.value.some((a) => a.name === existing)) {
-		selectedAddressName.value = existing;
-		const match = addresses.value.find((a) => a.name === existing) || null;
-		nextTick(() => {
-			emitAddress(match);
-		});
-		return;
-	}
-
-	// 2. Default to shipping address type if available, otherwise first address
-	const preferred =
-		addresses.value.find(
-			(a) => (a.address_type || "").toLowerCase() === "shipping",
-		) || addresses.value[0];
-
-	if (preferred) {
-		selectedAddressName.value = preferred.name;
-		nextTick(() => {
-			emitAddress(preferred);
-		});
-	}
+	selectedAddressName.value = preferred.name;
+	nextTick(() => {
+		emitAddress(preferred);
+	});
 };
 
 const fetchAddresses = async (customerName = props.customer) => {
@@ -323,9 +260,11 @@ const fetchAddresses = async (customerName = props.customer) => {
 	try {
 		const cached = getCachedCustomerAddresses(customerName);
 		if (Array.isArray(cached) && cached.length) {
-			addresses.value = cached
+			const normalized = cached
 				.map(normalizeAddress)
 				.filter((a): a is DeliveryAddressItem => a !== null);
+			const best = pickPreferredAddress(normalized);
+			addresses.value = best ? [best] : [];
 			syncSelection();
 		}
 	} catch (e) {
@@ -344,8 +283,9 @@ const fetchAddresses = async (customerName = props.customer) => {
 				const normalized = r.message
 					.map(normalizeAddress)
 					.filter((a): a is DeliveryAddressItem => a !== null);
-				addresses.value = normalized;
-				saveCustomerAddressesCache(customerName, normalized);
+				const best = pickPreferredAddress(normalized);
+				addresses.value = best ? [best] : [];
+				saveCustomerAddressesCache(customerName, addresses.value);
 				syncSelection();
 			}
 		} catch (e) {
@@ -413,6 +353,11 @@ const openNewAddressDialog = () => {
 		});
 		return;
 	}
+	// If the customer already has an address, redirect to editing that single address
+	if (selectedAddress.value) {
+		openEditAddressDialog();
+		return;
+	}
 	eventBus?.emit("open_new_address", props.customer);
 };
 
@@ -425,10 +370,7 @@ const openEditAddressDialog = () => {
 		return;
 	}
 	if (!selectedAddress.value) {
-		toastStore.show({
-			title: __("No address selected to edit"),
-			color: "warning",
-		});
+		openNewAddressDialog();
 		return;
 	}
 	eventBus?.emit("open_edit_address", {
@@ -441,8 +383,7 @@ const handleNewAddressCreated = (newAddr: any) => {
 	if (!newAddr) return;
 	const normalized = normalizeAddress(newAddr);
 	if (!normalized) return;
-	const existing = addresses.value.filter((a) => a.name !== normalized.name);
-	addresses.value = [...existing, normalized];
+	addresses.value = [normalized];
 	if (props.customer) {
 		saveCustomerAddressesCache(props.customer, addresses.value);
 	}
@@ -454,13 +395,7 @@ const handleAddressUpdated = (updatedAddr: any) => {
 	if (!updatedAddr) return;
 	const normalized = normalizeAddress(updatedAddr);
 	if (!normalized) return;
-	const idx = addresses.value.findIndex((a) => a.name === normalized.name);
-	if (idx >= 0) {
-		addresses.value[idx] = normalized;
-		addresses.value = [...addresses.value];
-	} else {
-		addresses.value = [...addresses.value, normalized];
-	}
+	addresses.value = [normalized];
 	if (props.customer) {
 		saveCustomerAddressesCache(props.customer, addresses.value);
 	}
@@ -539,6 +474,14 @@ defineExpose({
 .delivery-address-input {
 	width: 100%;
 	min-width: 0;
+}
+
+.address-field-clickable {
+	cursor: pointer;
+}
+
+.address-field-clickable :deep(input) {
+	cursor: pointer;
 }
 
 .icon-btn {

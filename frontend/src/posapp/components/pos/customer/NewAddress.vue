@@ -151,7 +151,7 @@ export default {
 			const addr = payload?.address || {};
 			this.address = {
 				name: addr.name || "",
-				address_line1: addr.address_line1 || addr.full_address || "",
+				address_line1: addr.address_line1 || addr.clean_display || addr.full_address || "",
 			};
 			this.customer = payload?.customer || "";
 			this.addressDialog = true;

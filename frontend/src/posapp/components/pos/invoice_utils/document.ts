@@ -162,6 +162,7 @@ export function get_invoice_doc(context: any) {
 	// fields explicitly so the first save (and the rider print that follows it)
 	// uses the address selected in the delivery-address card instead of allowing
 	// ERPNext to fall back to the customer's default address.
+	const storeDoc = context.invoiceStore?.invoiceDoc || {};
 	for (const fieldname of [
 		"customer_address",
 		"address_display",
@@ -170,6 +171,8 @@ export function get_invoice_doc(context: any) {
 	]) {
 		if (Object.prototype.hasOwnProperty.call(sourceDoc, fieldname)) {
 			doc[fieldname] = sourceDoc[fieldname];
+		} else if (Object.prototype.hasOwnProperty.call(storeDoc, fieldname)) {
+			doc[fieldname] = storeDoc[fieldname];
 		}
 	}
 
@@ -617,6 +620,29 @@ export function get_invoice_doc(context: any) {
 				payment.base_amount = -Math.abs(payment.base_amount);
 			}
 		});
+	}
+
+	const effectiveShippingAddr =
+		doc.shipping_address_name ||
+		sourceDoc.shipping_address_name ||
+		storeDoc.shipping_address_name ||
+		doc.customer_address ||
+		sourceDoc.customer_address ||
+		storeDoc.customer_address;
+	if (effectiveShippingAddr) {
+		doc.shipping_address_name = effectiveShippingAddr;
+		doc.customer_address = effectiveShippingAddr;
+	}
+	const effectiveAddressDisplay =
+		doc.shipping_address ||
+		sourceDoc.shipping_address ||
+		storeDoc.shipping_address ||
+		doc.address_display ||
+		sourceDoc.address_display ||
+		storeDoc.address_display;
+	if (effectiveAddressDisplay) {
+		doc.shipping_address = effectiveAddressDisplay;
+		doc.address_display = effectiveAddressDisplay;
 	}
 
 	return doc;

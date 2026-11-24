@@ -600,13 +600,9 @@ export default {
 				"";
 
 			this.invoice_doc.shipping_address_name = addressName;
-			if (addressName) {
-				this.invoice_doc.customer_address = addressName;
-			}
-			if (addressDisplay) {
-				this.invoice_doc.address_display = addressDisplay;
-				this.invoice_doc.shipping_address = addressDisplay;
-			}
+			this.invoice_doc.customer_address = addressName;
+			this.invoice_doc.address_display = addressDisplay;
+			this.invoice_doc.shipping_address = addressDisplay;
 
 			this.invoiceStore.mergeInvoiceDoc({
 				shipping_address_name: addressName,

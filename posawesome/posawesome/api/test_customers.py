@@ -59,6 +59,7 @@ def _install_stubs():
     frappe_module.get_value = lambda *args, **kwargs: None
     frappe_module.db = SimpleNamespace(
         get_value=lambda *args, **kwargs: None,
+        set_value=lambda *args, **kwargs: None,
         count=lambda *args, **kwargs: 0,
         escape=lambda value: f"'{value}'",
         table_exists=lambda doctype: True,
@@ -163,8 +164,63 @@ class TestCustomersApi(unittest.TestCase):
         self.assertEqual(result["address_title"], "New Street 123")
 
     def test_update_address_without_name_throws(self):
+        frappe = sys.modules["frappe"]
+        frappe.db.sql = lambda *args, **kwargs: []
         with self.assertRaises(Exception):
             self.module.update_address({"address_line1": "No name"})
+
+    def test_make_address_updates_existing_when_customer_has_address(self):
+        saved = []
+        mock_doc = AttrDict({
+            "name": "ADDR-001",
+            "address_line1": "Old Street",
+            "address_title": "ADDR-001",
+            "city": "Old City",
+            "save": lambda ignore_permissions=False: saved.append(True),
+            "as_dict": lambda: dict(mock_doc),
+        })
+
+        frappe = sys.modules["frappe"]
+        frappe.db.sql = lambda *args, **kwargs: [{"name": "ADDR-001", "address_line1": "Old Street"}]
+        frappe.get_doc = lambda doctype, name: mock_doc if doctype == "Address" and name == "ADDR-001" else None
+
+        result = self.module.make_address({
+            "customer": "CUST-001",
+            "address_line1": "Updated Street 99",
+            "city": "Lahore",
+        })
+
+        self.assertEqual(len(saved), 1)
+        self.assertEqual(result["address_line1"], "Updated Street 99")
+        self.assertEqual(result["city"], "Lahore")
+
+    def test_update_address_syncs_customer_primary_address(self):
+        saved = []
+        customer_set_values = []
+        mock_doc = AttrDict({
+            "name": "ADDR-001",
+            "address_line1": "Updated Street",
+            "address_title": "ADDR-001",
+            "city": "Lahore",
+            "links": [AttrDict({"link_doctype": "Customer", "link_name": "CUST-001"})],
+            "save": lambda ignore_permissions=False: saved.append(True),
+            "as_dict": lambda: dict(mock_doc),
+        })
+
+        frappe = sys.modules["frappe"]
+        frappe.get_doc = lambda doctype, name: mock_doc if doctype == "Address" and name == "ADDR-001" else None
+        frappe.db.set_value = lambda dt, name, values, update_modified=False: customer_set_values.append((dt, name, values))
+
+        self.module.update_address({
+            "name": "ADDR-001",
+            "address_line1": "Updated Street",
+            "customer": "CUST-001",
+        })
+
+        self.assertEqual(len(customer_set_values), 1)
+        self.assertEqual(customer_set_values[0][0], "Customer")
+        self.assertEqual(customer_set_values[0][1], "CUST-001")
+        self.assertEqual(customer_set_values[0][2]["customer_primary_address"], "ADDR-001")
 
 
 if __name__ == "__main__":

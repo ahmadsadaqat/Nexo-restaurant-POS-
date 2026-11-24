@@ -25,7 +25,7 @@ describe("InvoiceDeliveryAddress component", () => {
 		};
 	});
 
-	it("renders a dropdown when customer has multiple addresses", async () => {
+	it("renders a text field and picks preferred shipping address when raw data has multiple addresses", async () => {
 		mockGetCachedCustomerAddresses.mockReturnValue([
 			{
 				name: "ADDR-001",
@@ -58,10 +58,16 @@ describe("InvoiceDeliveryAddress component", () => {
 
 		await flushPromises();
 
-		// Should render autocomplete dropdown, not single text field
-		expect(wrapper.find("v-autocomplete").exists()).toBe(true);
-		expect(wrapper.find("v-text-field").exists()).toBe(false);
-		expect(wrapper.find("v-autocomplete").attributes("modelvalue")).toBe("ADDR-001");
+		// Enforce single-address model: renders text field with pencil, no dropdown
+		expect(wrapper.find("v-text-field").exists()).toBe(true);
+		expect(wrapper.find("v-autocomplete").exists()).toBe(false);
+		const field = wrapper.find("v-text-field");
+		const val =
+			field.attributes("modelvalue") ||
+			field.attributes("model-value") ||
+			(field.props() as any)?.modelValue ||
+			"";
+		expect(val).toContain("123 Elm St");
 
 		expect(onUpdateAddress).toHaveBeenCalled();
 		expect(onUpdateAddress.mock.calls[0][0]?.name).toBe("ADDR-001");
@@ -155,7 +161,7 @@ describe("InvoiceDeliveryAddress component", () => {
 		expect(field.attributes("placeholder")).toContain("Select customer first");
 	});
 
-	it("emits updated address when a new address is selected from autocomplete", async () => {
+	it("updates and emits address when updated via onAddressSelected or edit", async () => {
 		mockGetCachedCustomerAddresses.mockReturnValue([
 			{
 				name: "ADDR-001",
@@ -163,13 +169,6 @@ describe("InvoiceDeliveryAddress component", () => {
 				address_line1: "123 Elm St",
 				city: "Springfield",
 				address_type: "Shipping",
-			},
-			{
-				name: "ADDR-002",
-				address_title: "Office",
-				address_line1: "456 Tech Blvd",
-				city: "Metropolis",
-				address_type: "Billing",
 			},
 		]);
 
@@ -193,15 +192,12 @@ describe("InvoiceDeliveryAddress component", () => {
 			expect.objectContaining({ name: "ADDR-001" }),
 		);
 
-		// Now simulate selecting ADDR-002
-		const autocomplete = wrapper.find("v-autocomplete");
-		await autocomplete.trigger("update:model-value", "ADDR-002");
-		// In template: @update:model-value="onAddressSelected"
-		(wrapper.vm as any).onAddressSelected("ADDR-002");
+		// Now simulate updating address
+		(wrapper.vm as any).onAddressSelected("ADDR-001");
 		await flushPromises();
 
 		expect(onUpdateAddress).toHaveBeenLastCalledWith(
-			expect.objectContaining({ name: "ADDR-002" }),
+			expect.objectContaining({ name: "ADDR-001" }),
 		);
 	});
 

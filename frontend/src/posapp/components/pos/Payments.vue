@@ -2314,9 +2314,24 @@ const handleAddTheNewAddress = (data) => {
 	if (normalized) {
 		const existing = addresses.value.filter((addr) => addr.name !== normalized.name);
 		addresses.value = [...existing, normalized];
+		const display =
+			normalized.clean_display ||
+			normalized.full_address ||
+			normalized.display_title ||
+			normalized.address_line1 ||
+			"";
 		if (invoice_doc.value) {
 			invoice_doc.value.shipping_address_name = normalized.name;
+			invoice_doc.value.customer_address = normalized.name;
+			invoice_doc.value.shipping_address = display;
+			invoice_doc.value.address_display = display;
 		}
+		invoiceStore.mergeInvoiceDoc({
+			shipping_address_name: normalized.name,
+			customer_address: normalized.name,
+			shipping_address: display,
+			address_display: display,
+		});
 	}
 };
 
@@ -2355,6 +2370,7 @@ onMounted(() => {
 		eventBus.on("send_invoice_doc_payment", handleSendInvoiceDocPayment);
 		eventBus.on("register_pos_profile", handleRegisterPosProfile);
 		eventBus.on("add_the_new_address", handleAddTheNewAddress);
+		eventBus.on("address_updated", handleAddTheNewAddress);
 		eventBus.on("set_pos_settings", handleSetPosSettings);
 		eventBus.on("set_mpesa_payment", handleSetMpesaPayment);
 		eventBus.on("queue_submit_payment_shortcut", queueShortcutSubmit);
@@ -2371,6 +2387,7 @@ onBeforeUnmount(() => {
 	eventBus.off("send_invoice_doc_payment", handleSendInvoiceDocPayment);
 	eventBus.off("register_pos_profile", handleRegisterPosProfile);
 	eventBus.off("add_the_new_address", handleAddTheNewAddress);
+	eventBus.off("address_updated", handleAddTheNewAddress);
 	eventBus.off("set_pos_settings", handleSetPosSettings);
 	eventBus.off("set_mpesa_payment", handleSetMpesaPayment);
 	eventBus.off("queue_submit_payment_shortcut", queueShortcutSubmit);

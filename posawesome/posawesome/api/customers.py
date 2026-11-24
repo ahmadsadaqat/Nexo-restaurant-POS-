@@ -470,6 +470,8 @@ def set_customer_info(customer, fieldname, value="", pos_profile_doc=None, compa
 
 @frappe.whitelist()
 def get_customer_addresses(customer):
+    if not customer:
+        return []
     return frappe.db.sql(
         """
         SELECT
@@ -480,17 +482,39 @@ def get_customer_addresses(customer):
             address.city,
             address.state,
             address.country,
-            address.address_type
+            address.address_type,
+            address.is_shipping_address,
+            address.is_primary_address
         FROM `tabAddress` as address
         INNER JOIN `tabDynamic Link` AS link
                                 ON address.name = link.parent
         WHERE link.link_doctype = 'Customer'
             AND link.link_name = %s
             AND address.disabled = 0
-        ORDER BY address.name
+        ORDER BY address.is_shipping_address DESC, address.is_primary_address DESC, address.modified DESC
         """,
         (customer,),
         as_dict=1,
+    )
+
+
+def _sync_customer_primary_address(customer, address_doc):
+    if not customer or not address_doc or not frappe.db.exists("Customer", customer):
+        return
+    rendered = None
+    try:
+        from frappe.contacts.doctype.address.address import render_address
+        rendered = render_address(address_doc.name)
+    except Exception:
+        rendered = None
+    frappe.db.set_value(
+        "Customer",
+        customer,
+        {
+            "customer_primary_address": address_doc.name,
+            "primary_address": rendered or address_doc.address_line1 or "",
+        },
+        update_modified=False,
     )
 
 
@@ -499,10 +523,18 @@ def make_address(args):
     args = _load_json_arg(args)
     _assert_customer_write_allowed(args.get("pos_profile_doc"), company=args.get("company"))
 
+    customer = args.get("customer")
+    # Enforce single delivery address per customer: update existing if present
+    if customer:
+        existing = get_customer_addresses(customer)
+        if existing:
+            args["name"] = existing[0].get("name")
+            return update_address(args)
+
     address = frappe.get_doc(
         {
             "doctype": "Address",
-            "address_title": args.get("name") or args.get("address_line1"),
+            "address_title": args.get("address_title") or args.get("name") or args.get("address_line1"),
             "address_line1": args.get("address_line1"),
             "address_line2": args.get("address_line2"),
             "city": args.get("city") or "Lodhran",
@@ -510,9 +542,13 @@ def make_address(args):
             "pincode": args.get("pincode"),
             "country": args.get("country") or "Pakistan",
             "address_type": "Shipping",
-            "links": [{"link_doctype": args.get("doctype") or "Customer", "link_name": args.get("customer")}],
+            "is_shipping_address": 1,
+            "is_primary_address": 1,
+            "links": [{"link_doctype": args.get("doctype") or "Customer", "link_name": customer}],
         }
-    ).insert()
+    ).insert(ignore_permissions=True)
+
+    _sync_customer_primary_address(customer, address)
 
     return address
 
@@ -520,7 +556,14 @@ def make_address(args):
 @frappe.whitelist()
 def update_address(args):
     args = _load_json_arg(args)
+    customer = args.get("customer")
     address_name = args.get("name")
+
+    if not address_name and customer:
+        existing = get_customer_addresses(customer)
+        if existing:
+            address_name = existing[0].get("name")
+
     if not address_name or not frappe.db.exists("Address", address_name):
         frappe.throw(_("Address not found"))
     _assert_customer_write_allowed(args.get("pos_profile_doc"), company=args.get("company"))
@@ -542,7 +585,18 @@ def update_address(args):
         address.country = args.get("country")
     if args.get("pincode") is not None:
         address.pincode = args.get("pincode")
+    address.is_shipping_address = 1
+    address.is_primary_address = 1
     address.save(ignore_permissions=True)
+
+    if not customer:
+        for link in (getattr(address, "links", None) or []):
+            if link.link_doctype == "Customer":
+                customer = link.link_name
+                break
+
+    _sync_customer_primary_address(customer, address)
+
     return address
 
 

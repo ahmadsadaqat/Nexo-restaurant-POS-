@@ -762,6 +762,65 @@ def _clear_stale_party_fields_for_customer_change(
     return invoice_doc
 
 
+def _apply_delivery_address_details(invoice_doc, source_payload):
+    if not invoice_doc or not isinstance(source_payload, dict):
+        return
+
+    explicit_shipping = source_payload.get("shipping_address_name")
+    explicit_customer_address = source_payload.get("customer_address")
+    is_delivery = str(
+        source_payload.get("posa_order_type")
+        or getattr(invoice_doc, "posa_order_type", "")
+        or ""
+    ).strip().lower() == "delivery"
+
+    if explicit_shipping:
+        invoice_doc.shipping_address_name = explicit_shipping
+        try:
+            from frappe.contacts.doctype.address.address import render_address
+            rendered = render_address(explicit_shipping)
+        except Exception:
+            rendered = None
+        invoice_doc.shipping_address = (
+            rendered
+            or source_payload.get("shipping_address")
+            or invoice_doc.get("shipping_address")
+            or ""
+        )
+        if is_delivery or not explicit_customer_address or explicit_customer_address == explicit_shipping:
+            invoice_doc.customer_address = explicit_shipping
+            invoice_doc.address_display = invoice_doc.shipping_address
+
+    if explicit_customer_address:
+        if not (
+            explicit_shipping
+            and (is_delivery or explicit_customer_address == explicit_shipping)
+        ):
+            invoice_doc.customer_address = explicit_customer_address
+            try:
+                from frappe.contacts.doctype.address.address import render_address
+                rendered = render_address(explicit_customer_address)
+            except Exception:
+                rendered = None
+            invoice_doc.address_display = (
+                rendered
+                or source_payload.get("address_display")
+                or invoice_doc.get("address_display")
+                or ""
+            )
+            if not invoice_doc.get("shipping_address_name"):
+                invoice_doc.shipping_address_name = explicit_customer_address
+                invoice_doc.shipping_address = invoice_doc.address_display
+    elif not explicit_shipping and (source_payload.get("shipping_address") or source_payload.get("address_display")):
+        rendered_str = (
+            source_payload.get("shipping_address")
+            or source_payload.get("address_display")
+            or ""
+        )
+        invoice_doc.shipping_address = rendered_str
+        invoice_doc.address_display = rendered_str
+
+
 def _get_mutable_invoice_doc(data, doctype):
     invoice_name = (data or {}).get("name")
     if not invoice_name:
@@ -1114,27 +1173,7 @@ def update_invoice(data):
 
     # Re-apply explicit delivery addresses after set_missing_values has run,
     # preventing ERPNext from reverting to the customer's initial default address
-    explicit_shipping = data.get("shipping_address_name")
-    explicit_customer_address = data.get("customer_address")
-    if explicit_shipping:
-        invoice_doc.shipping_address_name = explicit_shipping
-        try:
-            from frappe.contacts.doctype.address.address import render_address
-            rendered = render_address(explicit_shipping)
-        except Exception:
-            rendered = None
-        invoice_doc.shipping_address = rendered or data.get("shipping_address") or ""
-        if data.get("posa_order_type") == "Delivery" or not explicit_customer_address or explicit_customer_address == explicit_shipping:
-            invoice_doc.customer_address = explicit_shipping
-            invoice_doc.address_display = invoice_doc.shipping_address
-    elif explicit_customer_address:
-        invoice_doc.customer_address = explicit_customer_address
-        try:
-            from frappe.contacts.doctype.address.address import render_address
-            rendered = render_address(explicit_customer_address)
-        except Exception:
-            rendered = None
-        invoice_doc.address_display = rendered or data.get("address_display") or ""
+    _apply_delivery_address_details(invoice_doc, data)
 
     _apply_tax_contract_before_save(invoice_doc)
 
@@ -1329,17 +1368,7 @@ def submit_invoice(invoice, data, submit_in_background=False):
             del invoice["modified"]
         invoice_doc = frappe.get_doc(doctype, invoice_name)
         invoice_doc.update(invoice)
-        if invoice.get("shipping_address_name"):
-            invoice_doc.shipping_address_name = invoice.get("shipping_address_name")
-            try:
-                from frappe.contacts.doctype.address.address import render_address
-                rendered = render_address(invoice_doc.shipping_address_name)
-            except Exception:
-                rendered = None
-            invoice_doc.shipping_address = rendered or invoice.get("shipping_address") or ""
-            if invoice.get("posa_order_type") == "Delivery" or not invoice.get("customer_address") or invoice.get("customer_address") == invoice_doc.shipping_address_name:
-                invoice_doc.customer_address = invoice_doc.shipping_address_name
-                invoice_doc.address_display = invoice_doc.shipping_address
+        _apply_delivery_address_details(invoice_doc, invoice)
 
     set_invoice_client_request_id(invoice_doc, client_request_id)
     if ledger_doc:
@@ -1451,6 +1480,7 @@ def submit_invoice(invoice, data, submit_in_background=False):
     invoice_doc.flags.ignore_permissions = True
     frappe.flags.ignore_account_permission = True
     invoice_doc.posa_is_printed = 1
+    _apply_delivery_address_details(invoice_doc, invoice)
     invoice_doc = _run_without_return_outstanding_prompts(
         invoice_doc,
         lambda: _save_draft_with_latest_timestamp(invoice_doc),
@@ -1586,6 +1616,7 @@ def submit_in_background_job(kwargs):
 
         _apply_invoice_gift_card_settlement(invoice_doc, data)
         _normalize_return_payment_rows(invoice_doc, invoice_doc.get("conversion_rate") or 1)
+        _apply_delivery_address_details(invoice_doc, invoice)
 
         invoice_doc = _save_draft_with_latest_timestamp(invoice_doc)
         _normalize_return_payment_rows(invoice_doc, invoice_doc.get("conversion_rate") or 1)
