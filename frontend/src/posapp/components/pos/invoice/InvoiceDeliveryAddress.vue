@@ -127,19 +127,7 @@ const normalizeAddress = (address: any): DeliveryAddressItem | null => {
 	].filter(Boolean);
 	const fullLine = parts.join(", ");
 
-	let cleanTitle = fullLine || addr.address_line1 || addr.name || "";
-	if (addr.address_title && fullLine) {
-		const rawTitle = String(addr.address_title).trim();
-		const cust = String(props.customer || "").trim();
-		const isAutoTitle =
-			rawTitle === cust ||
-			rawTitle.startsWith(`${cust} -`) ||
-			rawTitle.startsWith(`${cust}-`) ||
-			rawTitle.toLowerCase().includes("shipping");
-		if (!isAutoTitle && rawTitle !== fullLine) {
-			cleanTitle = `${rawTitle}: ${fullLine}`;
-		}
-	}
+	const cleanTitle = fullLine || addr.address_line1 || addr.name || "";
 
 	return {
 		...addr,

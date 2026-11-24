@@ -573,7 +573,7 @@ def update_address(args):
         address.address_title = args.get("address_title")
     if args.get("address_line1") is not None:
         address.address_line1 = args.get("address_line1")
-        if not address.address_title or address.address_title == address_name:
+        if args.get("address_title") is None:
             address.address_title = args.get("address_line1")
     if args.get("address_line2") is not None:
         address.address_line2 = args.get("address_line2")
